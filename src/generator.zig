@@ -351,10 +351,11 @@ fn writeClass(writer: std.fs.File.Writer, interface: *Interface, isSkeleton: boo
         \\
     , .{printType(isSkeleton)});
 
+    for (interface.signals.items) |signal| {
+        try writer.print("            signals.{s}.impl.register(.{{}});\n", .{signal.nick});
+    }
+
     if (isSkeleton) {
-        for (interface.signals.items) |signal| {
-            try writer.print("            signals.{s}.impl.register(.{{}});\n", .{signal.nick});
-        }
         _ = try writer.write(
             \\
             \\            gio.DBusInterfaceSkeleton.virtual_methods.get_vtable.implement(class, get_vtable);
@@ -362,7 +363,12 @@ fn writeClass(writer: std.fs.File.Writer, interface: *Interface, isSkeleton: boo
             \\
         );
     } else {
-        try writer.print("{s:12}gio.DBusProxy.virtual_methods.g_properties_changed.implement(class, onPropertyChanged);\n", .{""});
+        try writer.print(
+            \\
+            \\{s:12}gio.DBusProxy.virtual_methods.g_properties_changed.implement(class, onPropertyChanged);
+            \\{s:12}gio.DBusProxy.virtual_methods.g_signal.implement(class, onSignal);
+            \\
+        , .{ "", "" });
     }
 
     _ = try writer.write(
@@ -437,6 +443,110 @@ fn writeVirtualMethods(writer: std.fs.File.Writer, interface: *Interface) !void 
     _ = try writer.write("\n");
 }
 
+fn writeDBusSignals(writer: std.fs.File.Writer, interface: *Interface) !void {
+    try writer.print(
+        \\
+        \\{s:4}fn onPropertyChanged(proxy: *Proxy, p_changed_properties: *glib.Variant, _: *const [*:0]const u8) callconv(.C) void {{
+        \\{s:8}updateProperties(proxy, p_changed_properties);
+        \\{s:4}}}
+        \\
+    , .{ "", "", "" });
+
+    try writer.print(
+        \\
+        \\    fn onSignal(proxy: *Proxy, _: [*:0]const u8, p_signal_name: [*:0]const u8, v_parameters: *glib.Variant) callconv(.C) void {{
+        \\{s:8}const result = proxy.as(gio.DBusProxy).callSync(
+        \\{s:12}"org.freedesktop.DBus.Properties.GetAll",
+        \\{s:12}glib.ext.Variant.newFrom(.{{getInfo().f_name.?}}),
+        \\{s:12}.{{}},
+        \\{s:12}-1,
+        \\{s:12}null,
+        \\{s:12}null,
+        \\{s:8}).?;
+        \\{s:8}defer result.unref();
+        \\{s:8}const v_properties = result.getChildValue(0);
+        \\{s:8}defer v_properties.unref();
+        \\{s:8}updateProperties(proxy, v_properties);
+        \\
+        \\{s:8}var params: [64]*glib.Variant = undefined;
+        \\{s:8}const iter = v_parameters.iterNew();
+        \\{s:8}defer iter.free();
+        \\{s:8}const max = v_parameters.nChildren();
+        \\{s:8}for (0..max) |idx| {{
+        \\{s:12}params[idx] = iter.nextValue() orelse break;
+        \\{s:8}}}
+        \\
+        \\{s:8}const info = getInfo().lookupSignal(p_signal_name);
+    , .{""} ** 20);
+
+    for (interface.signals.items, 0..) |signal, idx| {
+        if (idx == 0) {
+            try writer.print("\n{s:7}", .{""});
+        } else {
+            _ = try writer.write(" else");
+        }
+
+        try writer.print(" if (info == dbus_info.f_signals.?[{d}]) {{\n", .{idx});
+        try writer.print("{s:12}signals.{s}.impl.emit(proxy, null, .{{", .{ "", signal.nick });
+
+        for (signal.args.items, 0..) |arg, arg_idx| {
+            try writer.print("params[{d}]{s}{s}", .{
+                arg_idx,
+                getVariantFunctionByType(arg.zig_type),
+                if (arg_idx == signal.args.items.len - 1) "" else ", ",
+            });
+        }
+
+        try writer.print("}},null);\n", .{});
+
+        try writer.print("{s:8}}}", .{""});
+    }
+
+    try writer.print(
+        \\
+        \\
+        \\{s:8}for (0..max) |idx| {{
+        \\{s:12}params[idx].unref();
+        \\{s:8}}}
+    , .{""} ** 3);
+    try writer.print("\n    }}\n", .{});
+}
+
+fn writeUpdateProperties(writer: std.fs.File.Writer, interface: *Interface) !void {
+    _ = try writer.write(
+        \\
+        \\    fn updateProperties(proxy: *Proxy, v_properties: *glib.Variant) void {
+        \\        const iter = v_properties.iterNew();
+        \\        defer iter.free();
+        \\
+        \\        var key: [*:0]const u8 = undefined;
+        \\        var variant: *glib.Variant = undefined;
+        \\        while (iter.next("{&sv}", &key, &variant) != 0) {
+        \\            const info = getInfo().lookupProperty(key);
+        \\            if (info == null) continue;
+        \\
+    );
+
+    for (interface.properties.items, 0..) |property, idx| {
+        if (idx == 0) {
+            try writer.print("\n{s:11}", .{""});
+        } else {
+            _ = try writer.write(" else");
+        }
+
+        try writer.print(" if (info == dbus_info.f_properties.?[{d}]) {{\n", .{idx});
+        if (property.signature.len == 1 and property.signature[0] == 'b') {
+            try writer.print("{s:16}proxy.{s} = (variant.getBoolean() == 1);\n", .{ "", property.nick });
+        } else {
+            try writer.print("{s:16}proxy.{s} = variant{s};\n", .{ "", property.nick, getVariantFunctionByType(property.zig_type) });
+        }
+        try writer.print("{s:12}}}", .{""});
+    }
+
+    try writer.print("\n{s:8}}}\n", .{""});
+    try writer.print("{s:4}}}\n", .{""});
+}
+
 fn writeProxy(writer: std.fs.File.Writer, interface: *Interface) !void {
     _ = try writer.write(
         \\pub const Proxy = extern struct {
@@ -479,35 +589,8 @@ fn writeProxy(writer: std.fs.File.Writer, interface: *Interface) !void {
     try writeVirtualMethods(writer, interface);
     try writeSignals(writer, interface, false);
     try writeClass(writer, interface, false);
+    try writeDBusSignals(writer, interface);
+    try writeUpdateProperties(writer, interface);
 
-    _ = try writer.write(
-        \\
-        \\    fn onPropertyChanged(proxy: *Proxy, p_changed_properties: *glib.Variant, _: *const [*:0]const u8) callconv(.C) void {
-        \\        const iter = p_changed_properties.iterNew();
-        \\        var key: [*:0]const u8 = undefined;
-        \\        var variant: *glib.Variant = undefined;
-        \\        while (iter.next("{&sv}", &key, &variant) != 0) {
-        \\            const info = getInfo().lookupProperty(key);
-        \\
-    );
-
-    for (interface.properties.items, 0..) |property, idx| {
-        if (idx == 0) {
-            try writer.print("\n{s:11}", .{""});
-        } else {
-            _ = try writer.write(" else");
-        }
-
-        try writer.print(" if (info == dbus_info.f_properties.?[{d}]) {{\n", .{idx});
-        if (property.signature.len == 1 and property.signature[0] == 'b') {
-            try writer.print("{s:16}proxy.{s} = (variant.getBoolean() == 1);\n", .{ "", property.nick });
-        } else {
-            try writer.print("{s:16}proxy.{s} = variant{s};\n", .{ "", property.nick, getVariantFunctionByType(property.zig_type) });
-        }
-        try writer.print("{s:12}}}", .{""});
-    }
-
-    try writer.print("\n{s:8}}}\n", .{""});
-    try writer.print("{s:4}}}\n", .{""});
     _ = try writer.write("};\n");
 }
