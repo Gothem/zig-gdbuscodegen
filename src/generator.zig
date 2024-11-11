@@ -233,7 +233,7 @@ fn writeProperties(writer: std.fs.File.Writer, interface: *Interface, is_skeleto
     for (interface.properties.items) |property| {
         try writer.print("    {s}: {s}{s},\n", .{
             property.nick,
-            if (!is_skeleton and (property.signature.len == 1 and std.mem.indexOfScalar(u8, "bynqihuxtd", property.signature[0]) == null)) "?" else "",
+            if (!is_skeleton and (std.mem.indexOfScalar(u8, "b", property.signature[0]) == null)) "?" else "",
             property.zig_type,
         });
     }
