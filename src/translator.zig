@@ -63,7 +63,7 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
             for (child.childrens.items) |arg| {
                 const name = arg.attributes.getEntry("name").?.value_ptr.*;
                 const signature = arg.attributes.getEntry("type").?.value_ptr.*;
-                const zig_type = try signatureToZigType(signature);
+                const zig_type = signatureToZigType(signature);
                 const direction_attr = arg.attributes.getEntry("direction");
                 const direction = if (direction_attr) |dir| dir.value_ptr.* else "in"; // for methods default to in
 
@@ -93,7 +93,7 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
             var args = std.ArrayList(Arg).init(allocator);
             for (child.childrens.items) |arg| {
                 const signature = arg.attributes.getEntry("type").?.value_ptr.*;
-                const zig_type = try signatureToZigType(signature);
+                const zig_type = signatureToZigType(signature);
 
                 try args.append(.{
                     .signature = signature,
@@ -109,7 +109,7 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
         }
         if (std.mem.eql(u8, child.name, "property")) {
             const signature = child.attributes.getEntry("type").?.value_ptr.*;
-            const zig_type = try signatureToZigType(signature);
+            const zig_type = signatureToZigType(signature);
             const access_str = child.attributes.getEntry("access").?.value_ptr.*;
             var access: Access = undefined;
 
@@ -137,7 +137,7 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
     return interface;
 }
 
-fn signatureToZigType(signature: []const u8) ![]const u8 {
+fn signatureToZigType(signature: []const u8) []const u8 {
     if (std.mem.eql(u8, signature, "as")) return "[*:null]const ?[*:0]const u8";
     if (signature.len > 1) return "*glib.Variant";
 
