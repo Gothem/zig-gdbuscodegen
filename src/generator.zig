@@ -38,7 +38,7 @@ fn writeDBusInfo(writer: std.fs.File.Writer, interface: *Interface) !void {
     // write dbus_info.methods
     for (interface.methods.items) |method| {
         try writer.print(
-            \\        @constCast(&.{{
+            \\        @constCast(&gio.DBusMethodInfo{{
             \\            .f_ref_count = -1,
             \\            .f_name = @constCast("{s}"),
             \\            .f_in_args = @constCast(&[_:null]?*gio.DBusArgInfo{{
@@ -51,7 +51,7 @@ fn writeDBusInfo(writer: std.fs.File.Writer, interface: *Interface) !void {
             const signature = entry.value_ptr.signature;
 
             try writer.print(
-                \\                @constCast(&.{{
+                \\                @constCast(&gio.DBusArgInfo{{
                 \\                    .f_ref_count = -1,
                 \\                    .f_name = @constCast("{s}"),
                 \\                    .f_signature = @constCast("{s}"),
@@ -79,7 +79,7 @@ fn writeDBusInfo(writer: std.fs.File.Writer, interface: *Interface) !void {
     // write dbus_signals
     for (interface.signals.items) |signal| {
         try writer.print(
-            \\        @constCast(&.{{
+            \\        @constCast(&gio.DBusSignalInfo{{
             \\            .f_ref_count = -1,
             \\            .f_name = @constCast("{s}"),
             \\            .f_args = @constCast(&[_:null]?*gio.DBusArgInfo{{
@@ -88,7 +88,7 @@ fn writeDBusInfo(writer: std.fs.File.Writer, interface: *Interface) !void {
         for (signal.args.items) |arg| {
             try writer.print(
                 \\
-                \\                @constCast(&.{{
+                \\                @constCast(&gio.DBusArgInfo{{
                 \\                    .f_ref_count = -1,
                 \\                    .f_name = null,
                 \\                    .f_signature = @constCast("{s}"),
@@ -118,7 +118,7 @@ fn writeDBusInfo(writer: std.fs.File.Writer, interface: *Interface) !void {
     // write dbus_properties
     for (interface.properties.items) |property| {
         try writer.print(
-            \\        @constCast(&.{{
+            \\        @constCast(&gio.DBusPropertyInfo{{
             \\            .f_ref_count = -1,
             \\            .f_name = @constCast("{s}"),
             \\            .f_signature = @constCast("{s}"),
@@ -186,11 +186,11 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
         \\
         \\    pub fn get_vtable(_: *Skeleton) callconv(.C) *gio.DBusInterfaceVTable {
         \\        var zero: u8 = 0;
-        \\        return @constCast(&.{
-        \\            .method_call = &methodCall,
-        \\            .get_property = &getProperty,
-        \\            .set_property = null,
-        \\            .padding = [_]*anyopaque{@ptrCast(&zero)} ** 8,
+        \\        return @constCast(&gio.DBusInterfaceVTable{
+        \\            .f_method_call = &methodCall,
+        \\            .f_get_property = &getProperty,
+        \\            .f_set_property = null,
+        \\            .f_padding = [_]*anyopaque{@ptrCast(&zero)} ** 8,
         \\        });
         \\    }
         \\
@@ -213,7 +213,7 @@ fn printType(isSkeleton: bool) []const u8 {
 
 fn writeMethods(writer: std.fs.File.Writer, interface: *Interface) !void {
     for (interface.methods.items) |method| {
-        try writer.print("    {s}: ?*const fn (interface: *Skeleton, invocation: *gio.DBusMethodInvocation, ", .{method.name});
+        try writer.print("    {s}: ?*const fn (interface: *Skeleton, invocation: ?*gio.DBusMethodInvocation, ", .{method.name});
         var iter = method.in_args.iterator();
         var idx: u8 = 1;
         while (iter.next()) |arg| {
@@ -233,7 +233,7 @@ fn writeProperties(writer: std.fs.File.Writer, interface: *Interface, is_skeleto
     for (interface.properties.items) |property| {
         try writer.print("    {s}: {s}{s},\n", .{
             property.nick,
-            if (!is_skeleton and (std.mem.indexOfScalar(u8, "b", property.signature[0]) == null)) "?" else "",
+            if (!is_skeleton and (std.mem.indexOfScalar(u8, "bynqiuxt", property.signature[0]) == null)) "?" else "",
             property.zig_type,
         });
     }
@@ -258,7 +258,7 @@ fn writeMethodCall(writer: std.fs.File.Writer, interface: *Interface) !void {
     );
 
     for (interface.methods.items, 0..) |method, idx| {
-        try writer.print("        if (info == dbus_info.methods.?[{d}] and interface.{s} != null) return interface.{s}.?(interface, p_invocation, ", .{ idx, method.name, method.name });
+        try writer.print("        if (info == dbus_info.f_methods.?[{d}] and interface.{s} != null) return interface.{s}.?(interface, p_invocation, ", .{ idx, method.name, method.name });
         var arg_idx: u8 = 1;
         for (method.in_args.values()) |arg| {
             const is_end = if (arg_idx == method.in_args.count()) "" else ", ";
@@ -299,7 +299,7 @@ fn writeGetProperty(writer: std.fs.File.Writer, interface: *Interface) !void {
         if (std.mem.eql(u8, property.signature, "as")) {
             try writer.print("{s:12}return glib.Variant.newStrv(interface.{s}, -1);\n", .{ "", property.nick });
         } else {
-            try writer.print("{s:12}return glib.Variant.new(info.signature.?, interface.{s});\n", .{ "", property.nick });
+            try writer.print("{s:12}return glib.Variant.new(info.f_signature.?, interface.{s});\n", .{ "", property.nick });
         }
         try writer.print("{s:8}}}", .{""});
     }
