@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const xml = b.dependency("zig-xml", .{
+    const xml = b.dependency("xml", .{
         .target = target,
         .optimize = optimize,
     });
