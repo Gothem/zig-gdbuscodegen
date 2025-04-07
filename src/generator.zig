@@ -7,6 +7,7 @@ const Access = translator.Access;
 pub fn start(allocator: std.mem.Allocator, interface: *Interface) !void {
     try std.fs.cwd().makePath("bindings");
     const out_path = try std.mem.concat(allocator, u8, &.{ "bindings/", interface.name, ".zig" });
+    defer allocator.free(out_path);
     var out_file = try std.fs.cwd().createFile(out_path, .{});
     const writer = out_file.writer();
     try writeIncludes(writer);

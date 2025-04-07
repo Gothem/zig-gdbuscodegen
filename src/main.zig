@@ -17,12 +17,13 @@ pub fn main() !void {
         return error.InvalidArguments;
     }
 
-    for (args) |arg| {
+    for (args[1..]) |arg| {
         std.debug.print("arg: {s}\n", .{arg});
+
+        const node = try xml.loadFromPath(allocator, arg);
+        defer node.destroy(allocator);
+        const interface = try translator.newFromNode(allocator, node);
+        defer allocator.destroy(interface);
+        try generator.start(allocator, interface);
     }
-    const node = try xml.loadFromPath(allocator, args[1]);
-    defer node.destroy(allocator);
-    const interface = try translator.newFromNode(allocator, node);
-    defer allocator.destroy(interface);
-    try generator.start(allocator, interface);
 }
