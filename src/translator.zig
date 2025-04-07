@@ -24,6 +24,7 @@ const Property = struct {
     nick: []const u8,
     signature: []const u8,
     zig_type: []const u8,
+    function_name: []const u8,
     access: Access,
     //annotations: anyopaque, TODO
 };
@@ -37,7 +38,6 @@ const Signal = struct {
 pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
     if (std.mem.eql(u8, node.name, "node")) {
         for (node.childrens.items) |child| {
-            std.debug.print("GOING IN\n", .{});
             return try newFromNode(allocator, child);
         }
     }
@@ -55,7 +55,6 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
 
     for (node.childrens.items) |child| {
         const child_name = child.attributes.getEntry("name").?.value_ptr.*;
-        const nick = try removeRedundantWords(allocator, child_name, redundant_words.items);
         if (std.mem.eql(u8, child.name, "method")) {
             var in_args = std.StringArrayHashMap(Arg).init(allocator);
             var out_args = std.StringArrayHashMap(Arg).init(allocator);
@@ -90,6 +89,7 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
             });
         }
         if (std.mem.eql(u8, child.name, "signal")) {
+            const nick = try removeRedundantWords(allocator, child_name, redundant_words.items, true);
             var args = std.ArrayList(Arg).init(allocator);
             for (child.childrens.items) |arg| {
                 const signature = arg.attributes.getEntry("type").?.value_ptr.*;
@@ -108,8 +108,19 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
             });
         }
         if (std.mem.eql(u8, child.name, "property")) {
+            var repeated = false;
+            var nick = try removeRedundantWords(allocator, child_name, redundant_words.items, true);
+            // Check if already exists
+            for (interface.properties.items) |property| {
+                if (std.mem.eql(u8, nick, property.nick)) {
+                    nick = try removeRedundantWords(allocator, child_name, &.{}, true);
+                    repeated = true;
+                }
+            }
+
             const signature = child.attributes.getEntry("type").?.value_ptr.*;
             const zig_type = signatureToZigType(signature);
+            const function_name = try removeRedundantWords(allocator, child_name, if (repeated) &.{} else redundant_words.items, false);
             const access_str = child.attributes.getEntry("access").?.value_ptr.*;
             var access: Access = undefined;
 
@@ -126,6 +137,7 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
                 .nick = nick,
                 .signature = signature,
                 .zig_type = zig_type,
+                .function_name = function_name,
                 .access = access,
             });
         }
@@ -138,7 +150,7 @@ pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
 }
 
 fn signatureToZigType(signature: []const u8) []const u8 {
-    if (std.mem.eql(u8, signature, "as")) return "[*:null]const ?[*:0]const u8";
+    if (std.mem.eql(u8, signature, "as")) return "[*:null]?[*:0]const u8";
     if (signature.len > 1) return "*glib.Variant";
 
     switch (signature[0]) {
@@ -156,38 +168,9 @@ fn signatureToZigType(signature: []const u8) []const u8 {
     }
 }
 
-//fn signatureToZigType(allocator: std.mem.Allocator, signature: []const u8) ![]const u8 {
-//    var zig_type = std.ArrayList(u8).init(allocator);
-//    var depth: u8 = 0;
-//    for (signature) |char| {
-//        switch (char) {
-//            'y' => try zig_type.appendSlice("u8"),
-//            'b' => try zig_type.appendSlice("bool"),
-//            'i' => try zig_type.appendSlice("i32"),
-//            'u' => try zig_type.appendSlice("u32"),
-//            's', 'o', 'v' => try zig_type.appendSlice("[*:0]const u8"),
-//            'a' => try zig_type.appendSlice("[*:null]?"),
-//            '(', '{' => {
-//                try zig_type.appendSlice("struct {");
-//                depth += 1;
-//            },
-//            ')', '}' => {
-//                try zig_type.appendSlice("}");
-//                depth -= 1;
-//            },
-//            else => {
-//                std.debug.print("Unknown signature: {s}\n", .{signature});
-//                return error.TranslateError;
-//            },
-//        }
-//        if (depth > 0 and std.mem.indexOfScalar(u8, "a({", char) == null) try zig_type.appendSlice(//",");
-//    }
-//    // TODO
-//    return zig_type.items;
-//}
-
 fn getRedundantWords(allocator: std.mem.Allocator, values: []const u8) !std.ArrayList([]const u8) {
     var words = std.ArrayList([]const u8).init(allocator);
+    try words.append("Is");
 
     const lowered_values = try std.ascii.allocLowerString(allocator, values);
     defer allocator.free(lowered_values);
@@ -204,11 +187,13 @@ fn getRedundantWords(allocator: std.mem.Allocator, values: []const u8) !std.Arra
     return words;
 }
 
-fn removeRedundantWords(allocator: std.mem.Allocator, input: []const u8, words: [][]const u8) ![]u8 {
+fn removeRedundantWords(allocator: std.mem.Allocator, input: []const u8, words: [][]const u8, snake_case: bool) ![]const u8 {
     var input_idx: usize = 0;
     var output_idx: usize = 0;
     var end: usize = input.len;
+    var block_remove: bool = false; // Fix for StatusNotifierItem.NewStatus
 
+    // Find output size
     outer: while (output_idx < end) {
         for (words) |word| {
             if (std.mem.startsWith(u8, input[input_idx..], word)) {
@@ -218,7 +203,7 @@ fn removeRedundantWords(allocator: std.mem.Allocator, input: []const u8, words: 
             }
         }
 
-        if (std.ascii.isUpper(input[input_idx]) and output_idx > 0) {
+        if (snake_case and std.ascii.isUpper(input[input_idx]) and output_idx > 0) {
             end += 1;
             output_idx += 1;
         }
@@ -226,23 +211,30 @@ fn removeRedundantWords(allocator: std.mem.Allocator, input: []const u8, words: 
         input_idx += 1;
     }
 
-    if (end == 0) return std.ascii.allocLowerString(allocator, input);
+    if (end == 0) return if (snake_case) std.ascii.allocLowerString(allocator, input) else input;
+    if (output_idx < input_idx and std.mem.eql(u8, input[0..output_idx], "New")) {
+        block_remove = true;
+        end = input_idx + 1;
+    }
 
+    // Proceed to remove redundant words
     var output: []u8 = try allocator.alloc(u8, end);
     input_idx = 0;
     output_idx = 0;
     outer: while (output_idx < end) {
-        for (words) |word| {
-            if (std.mem.startsWith(u8, input[input_idx..], word)) {
-                input_idx += word.len;
-                continue :outer;
+        if (!block_remove) {
+            for (words) |word| {
+                if (std.mem.startsWith(u8, input[input_idx..], word)) {
+                    input_idx += word.len;
+                    continue :outer;
+                }
             }
         }
-        if (std.ascii.isUpper(input[input_idx]) and output_idx > 0) {
+        if (snake_case and std.ascii.isUpper(input[input_idx]) and output_idx > 0) {
             output[output_idx] = '_';
             output_idx += 1;
         }
-        output[output_idx] = std.ascii.toLower(input[input_idx]);
+        output[output_idx] = if (snake_case) std.ascii.toLower(input[input_idx]) else input[input_idx];
         output_idx += 1;
         input_idx += 1;
     }
