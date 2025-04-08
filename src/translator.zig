@@ -2,11 +2,18 @@ const std = @import("std");
 const xml = @import("xml");
 
 pub const Interface = struct {
+    arena: *std.heap.ArenaAllocator,
     name: []const u8,
     service_name: []const u8,
     methods: std.ArrayList(Method),
     properties: std.ArrayList(Property),
     signals: std.ArrayList(Signal),
+
+    pub fn deinit(self: *@This()) void {
+        const allocator = self.arena.child_allocator;
+        self.arena.deinit();
+        allocator.destroy(self.arena);
+    }
 };
 const Arg = struct {
     signature: []const u8,
@@ -35,21 +42,29 @@ const Signal = struct {
     //annotations: anyopaque, TODO
 };
 
-pub fn newFromNode(allocator: std.mem.Allocator, node: *xml.Node) !*Interface {
+pub fn newFromNode(gpa: std.mem.Allocator, node: *xml.Node) !*Interface {
     if (std.mem.eql(u8, node.name, "node")) {
         for (node.childrens.items) |child| {
-            return try newFromNode(allocator, child);
+            return try newFromNode(gpa, child);
         }
     }
     if (!std.mem.eql(u8, node.name, "interface")) return error.NoInterfaceDetected;
 
-    const interface = try allocator.create(Interface);
-    interface.service_name = (node.attributes.getEntry("name") orelse return error.NoInterfaceName).value_ptr.*;
-    interface.name = interface.service_name[std.mem.lastIndexOfScalar(u8, interface.service_name, '.').? + 1 ..];
-    interface.methods = std.ArrayList(Method).init(allocator);
-    interface.properties = std.ArrayList(Property).init(allocator);
-    interface.signals = std.ArrayList(Signal).init(allocator);
+    const arena = try gpa.create(std.heap.ArenaAllocator);
+    errdefer gpa.destroy(arena);
+    arena.* = std.heap.ArenaAllocator.init(gpa);
+    errdefer arena.deinit();
+    const allocator = arena.allocator();
 
+    const interface = try allocator.create(Interface);
+    interface.* = .{
+        .service_name = (node.attributes.getEntry("name") orelse return error.NoInterfaceName).value_ptr.*,
+        .name = interface.service_name[std.mem.lastIndexOfScalar(u8, interface.service_name, '.').? + 1 ..],
+        .methods = std.ArrayList(Method).init(allocator),
+        .properties = std.ArrayList(Property).init(allocator),
+        .signals = std.ArrayList(Signal).init(allocator),
+        .arena = arena,
+    };
     const redundant_words = try getRedundantWords(allocator, interface.name);
     defer redundant_words.deinit();
 

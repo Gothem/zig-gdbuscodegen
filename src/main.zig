@@ -9,6 +9,7 @@ pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
+    defer _ = gpa.detectLeaks();
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -23,7 +24,7 @@ pub fn main() !void {
         const node = try xml.loadFromPath(allocator, arg);
         defer node.destroy(allocator);
         const interface = try translator.newFromNode(allocator, node);
-        defer allocator.destroy(interface);
+        defer interface.deinit();
         try generator.start(allocator, interface);
     }
 }
