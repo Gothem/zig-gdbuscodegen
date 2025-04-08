@@ -4,11 +4,12 @@ const translator = @import("translator.zig");
 const Interface = translator.Interface;
 const Access = translator.Access;
 
-pub fn start(allocator: std.mem.Allocator, interface: *Interface) !void {
-    try std.fs.cwd().makePath("bindings");
-    const out_path = try std.mem.concat(allocator, u8, &.{ "bindings/", interface.name, ".zig" });
+pub fn start(allocator: std.mem.Allocator, interface: *Interface, output_dir: []const u8) !void {
+    try std.fs.cwd().makePath(output_dir);
+    const out_path = try std.mem.concat(allocator, u8, &.{ output_dir, "/", interface.name, ".zig" });
     defer allocator.free(out_path);
     var out_file = try std.fs.cwd().createFile(out_path, .{});
+    defer out_file.close();
     const writer = out_file.writer();
     try writeIncludes(writer);
     try writeDBusInfo(writer, interface);
