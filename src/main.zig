@@ -11,29 +11,34 @@ pub fn main() !void {
     const allocator = gpa.allocator();
     defer std.debug.assert(gpa.deinit() == .ok);
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var args = try std.process.ArgIterator.initWithAllocator(allocator);
+    defer args.deinit();
 
-    if (args.len < 2) {
+    if (args.inner.count < 2) {
         return error.InvalidArguments;
     }
 
-    const output_dir = "bindings";
+    var o_output_dir: ?[]const u8 = null;
 
     var output_files = std.ArrayList([]const u8).init(allocator);
     defer output_files.deinit();
 
-    for (args[1..]) |arg| {
-        std.debug.print("arg: {s}\n", .{arg});
-
-        const node = try xml.loadFromPath(allocator, arg);
-        defer node.destroy(allocator);
-        const interface = try translator.newFromNode(allocator, node);
-        defer interface.deinit();
-        try generator.start(allocator, interface, output_dir);
-        try output_files.append(try allocator.dupe(u8, interface.name));
+    _ = args.skip();
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "-o")) {
+            o_output_dir = args.next() orelse return error.MissingArg;
+        } else {
+            const output_dir = o_output_dir orelse "bindings";
+            const node = try xml.loadFromPath(allocator, arg);
+            defer node.destroy(allocator);
+            const interface = try translator.newFromNode(allocator, node);
+            defer interface.deinit();
+            try generator.start(allocator, interface, output_dir);
+            try output_files.append(try allocator.dupe(u8, interface.name));
+        }
     }
 
+    const output_dir = o_output_dir orelse "bindings";
     const out_path = try std.mem.concat(allocator, u8, &.{ output_dir, "/root.zig" });
     defer allocator.free(out_path);
     var out_file = try std.fs.cwd().createFile(out_path, .{});
