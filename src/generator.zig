@@ -657,11 +657,11 @@ fn writeProxy(writer: std.fs.File.Writer, interface: *Interface) !void {
         \\    }
         \\
         \\    pub fn new(p_connection: *gio.DBusConnection, flags: gio.DBusProxyFlags, p_name: ?[*:0]const u8, p_object_path: [*:0]const u8, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void {
-        \\        gio.AsyncInitable.newAsync(Proxy.getGObjectType(), glib.PRIORITY_DEFAULT, p_cancellable, p_callback, p_user_data, "g-flags", @as(c_uint, @bitCast(flags)), "g-name", p_name, "g-connection", p_connection, "g-object-path", p_object_path, "g-interface-name", getInfo().f_name);
+        \\        gio.AsyncInitable.newAsync(Proxy.getGObjectType(), glib.PRIORITY_DEFAULT, p_cancellable, p_callback, p_user_data, "g-flags", @as(c_uint, @bitCast(flags)), "g-name", p_name, "g-connection", p_connection, "g-object-path", p_object_path, "g-interface-name", getInfo().f_name, @as(?[*:0]const u8, null));
         \\    }
         \\
         \\    pub fn newSync(p_connection: *gio.DBusConnection, flags: gio.DBusProxyFlags, p_name: ?[*:0]const u8, p_object_path: [*:0]const u8, p_cancellable: ?*gio.Cancellable, p_error: ?**glib.Error) ?*Proxy {
-        \\        return @ptrCast(@alignCast(gio.Initable.new(Proxy.getGObjectType(), p_cancellable, p_error, "g-flags", @as(c_uint, @bitCast(flags)), "g-name", p_name, "g-connection", p_connection, "g-object-path", p_object_path, "g-interface-name", getInfo().f_name.?)));
+        \\        return @ptrCast(@alignCast(gio.Initable.new(Proxy.getGObjectType(), p_cancellable, p_error, "g-flags", @as(c_uint, @bitCast(flags)), "g-name", p_name, "g-connection", p_connection, "g-object-path", p_object_path, "g-interface-name", getInfo().f_name.?, @as(?[*:0]const u8, null))));
         \\    }
         \\
         \\    pub fn finish(p_res: *gio.AsyncResult, p_error: ?*?*glib.Error) ?*Proxy {
