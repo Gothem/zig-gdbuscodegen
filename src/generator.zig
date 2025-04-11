@@ -62,10 +62,30 @@ fn writeDBusInfo(writer: std.fs.File.Writer, interface: *Interface) !void {
                 \\
             , .{ name, signature });
         }
+        _ = try writer.print(
+            \\{s:12}}}),
+            \\{s:12}.f_out_args = @constCast(&[_:null]?*gio.DBusArgInfo{{
+            \\
+        , .{""} ** 2);
+
+        var out_iter = method.out_args.iterator();
+        while (out_iter.next()) |entry| {
+            const name = entry.key_ptr.*;
+            const signature = entry.value_ptr.signature;
+
+            try writer.print(
+                \\                @constCast(&gio.DBusArgInfo{{
+                \\                    .f_ref_count = -1,
+                \\                    .f_name = @constCast("{s}"),
+                \\                    .f_signature = @constCast("{s}"),
+                \\                    .f_annotations = null,
+                \\                }}),
+                \\
+            , .{ name, signature });
+        }
 
         try writer.print(
             \\            }}),
-            \\            .f_out_args = null,
             \\            .f_annotations = null,
             \\        }}),
             \\
