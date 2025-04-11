@@ -30,14 +30,49 @@ pub fn build(b: *std.Build) !void {
     run_step.dependOn(&run_exe.step);
 }
 
-pub fn generateBindingModule(b: *std.Build, dbus_file: []const u8, interface_name: []const u8) *std.Build.Module {
-    const dependency = b.dependencyFromBuildZig(@This(), .{});
-    const generator = dependency.artifact("gdbus-codegen");
-    const run_exe = b.addRunArtifact(generator);
-    run_exe.addArg(dbus_file);
-    const path = b.fmt("bindings/{s}.zig", .{interface_name});
-    _ = run_exe.captureStdOut();
-    return b.createModule(.{
-        .root_source_file = b.path(path),
-    });
-}
+const build_file = @This();
+
+pub const Scanner = struct {
+    build: *std.Build,
+    run: *std.Build.Step.Run,
+    result: std.Build.LazyPath,
+
+    const Dependencies = struct {
+        glib: *std.Build.Module,
+        gobject: *std.Build.Module,
+        gio: *std.Build.Module,
+    };
+
+    pub fn init(b: *std.Build) *Scanner {
+        const self = b.dependencyFromBuildZig(build_file, .{});
+        const exe = self.artifact("gdbus-codegen");
+        const run = self.builder.addRunArtifact(exe);
+
+        run.addArg("-o");
+        const result = run.addOutputDirectoryArg("gdbus");
+
+        const scanner = b.allocator.create(Scanner) catch @panic("Out of memory");
+        scanner.* = .{
+            .build = b,
+            .run = run,
+            .result = result,
+        };
+        return scanner;
+    }
+
+    pub fn createModule(scanner: *@This(), dependencies: Dependencies) *std.Build.Module {
+        return scanner.build.createModule(.{
+            .root_source_file = scanner.result.path(scanner.build, "root.zig"),
+            .imports = &.{
+                .{ .name = "glib", .module = dependencies.glib },
+                .{ .name = "gobject", .module = dependencies.gobject },
+                .{ .name = "gio", .module = dependencies.gio },
+            },
+        });
+    }
+
+    pub fn addProtocol(scanner: *@This(), sub_path: []const u8) void {
+        const path = scanner.build.path(sub_path);
+        scanner.run.addFileArg(path);
+    }
+};
