@@ -10,6 +10,7 @@ pub fn main() !void {
     log.debug("Hello from server.", .{});
 
     loop = glib.MainLoop.new(null, @intFromBool(false));
+    defer loop.unref();
 
     const dbus = DBusTest.Skeleton.new();
     _ = gio.busOwnName(

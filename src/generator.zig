@@ -192,7 +192,12 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
 
     _ = try writer.write(
         \\    pub const Parent = gio.DBusInterfaceSkeleton;
-        \\
+        \\    var VTable = gio.DBusInterfaceVTable{
+        \\        .f_get_property = &getProperty,
+        \\        .f_method_call = &methodCall,
+        \\        .f_set_property = null,
+        \\        .f_padding = .{@as(*anyopaque, "")} ** 8,
+        \\    };
         \\
     );
 
@@ -234,11 +239,7 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
         \\    }
         \\
         \\    pub fn get_vtable(_: *Skeleton) callconv(.C) *gio.DBusInterfaceVTable {
-        \\        var vtable = glib.ext.create(gio.DBusInterfaceVTable);
-        \\        vtable.f_method_call = &methodCall;
-        \\        vtable.f_get_property = &getProperty;
-        \\        vtable.f_set_property = null;
-        \\        return vtable;
+        \\        return &VTable;
         \\    }
         \\
         \\    pub fn get_info(_: *Skeleton) callconv(.C) *gio.DBusInterfaceInfo {
@@ -355,21 +356,32 @@ fn writeMethodCall(writer: std.fs.File.Writer, interface: *Interface) !void {
         \\        const interface: *Skeleton = @ptrCast(@alignCast(p_user_data));
         \\        const info = p_invocation.getMethodInfo() orelse return;
         \\        var iter = p_parameters.iterNew();
+        \\        defer iter.free();
         \\
         \\
     );
 
     for (interface.methods.items, 0..) |method, idx| {
-        try writer.print("        if (info == dbus_info.f_methods.?[{d}] and interface.{s} != null) return interface.{s}.?(interface, p_invocation, ", .{ idx, method.name, method.name });
-        var arg_idx: u8 = 1;
-        for (method.in_args.values()) |arg| {
+        try writer.print("        if (info == dbus_info.f_methods.?[{d}] and interface.{s} != null) {{\n", .{ idx, method.name });
+        for (method.in_args.values(), 1..) |_, arg_idx| {
+            try writer.print(
+                \\            const v{d} = iter.nextValue() orelse return;
+                \\            defer v{d}.unref();
+                \\
+            , .{ arg_idx, arg_idx });
+        }
+        try writer.print("            return interface.{s}.?(interface, p_invocation, ", .{method.name});
+        for (method.in_args.values(), 1..) |arg, arg_idx| {
             const is_end = if (arg_idx == method.in_args.count()) "" else ", ";
-            try writer.print("iter.nextValue().?{s}{s}", .{ getVariantFunctionByType(arg.zig_type), is_end });
-            arg_idx += 1;
+            try writer.print("v{d}{s}{s}", .{ arg_idx, getVariantFunctionByType(arg.zig_type), is_end });
         }
         _ = try writer.write(");\n");
     }
-    _ = try writer.write("    }\n");
+    _ = try writer.write(
+        \\        }
+        \\    }
+        \\
+    );
 }
 
 fn writeGetProperty(writer: std.fs.File.Writer, interface: *Interface) !void {
