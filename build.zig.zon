@@ -1,7 +1,7 @@
 .{
     .name = .gdbuscodegen,
     .fingerprint = 0x564551a5f5a70905,
-    .version = "0.1.1",
+    .version = "0.1.2",
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .xml = .{

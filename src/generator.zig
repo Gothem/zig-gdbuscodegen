@@ -375,10 +375,13 @@ fn writeMethodCall(writer: std.fs.File.Writer, interface: *Interface) !void {
             const is_end = if (arg_idx == method.in_args.count()) "" else ", ";
             try writer.print("v{d}{s}{s}", .{ arg_idx, getVariantFunctionByType(arg.zig_type), is_end });
         }
-        _ = try writer.write(");\n");
+        _ = try writer.write(
+            \\);
+            \\        }
+            \\
+        );
     }
     _ = try writer.write(
-        \\        }
         \\    }
         \\
     );
