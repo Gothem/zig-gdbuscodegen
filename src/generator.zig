@@ -246,6 +246,9 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
         \\        return getInfo();
         \\    }
         \\
+        \\    extern fn g_object_unref(p_self: *Skeleton) void;
+        \\    pub const unref = g_object_unref;
+        \\
     );
 
     try writeMethodCall(writer, interface);
@@ -706,6 +709,9 @@ fn writeProxy(writer: std.fs.File.Writer, interface: *Interface) !void {
         \\        if (o_ret) |ret| return @ptrCast(@alignCast(ret));
         \\        return null;
         \\    }
+        \\
+        \\    extern fn g_object_unref(p_self: *Proxy) void;
+        \\    pub const unref = g_object_unref;
         \\
         \\
     );
