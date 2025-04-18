@@ -26,7 +26,7 @@ const Method = struct {
     //annotations: anyopaque, TODO
 };
 pub const Access = enum { read, write, readwrite };
-const Property = struct {
+pub const Property = struct {
     name: []const u8,
     nick: []const u8,
     signature: []const u8,

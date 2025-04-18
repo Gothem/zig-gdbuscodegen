@@ -306,7 +306,7 @@ pub const Variant = struct {
 pub const VariantType = struct {
     /// Returns a new variant type corresponding to the given type.
     pub fn newFor(comptime T: type) *glib.VariantType {
-        return glib.VariantType.new(stringFor(T));
+        return glib.VariantType.new(comptime stringFor(T));
     }
 
     /// Returns the variant type string corresponding to the given type.

@@ -16,6 +16,9 @@ pub fn main() !void {
     const connection = gio.busGetSync(gio.BusType.session, null, null) orelse @panic("No connection");
     defer connection.unref();
     const proxy = DBusTest.Proxy.newSync(connection, .{}, "org.example.Test", "/Test", null, null) orelse @panic("Proxy failed");
+    defer proxy.unref();
+    defer log.debug("proxy.property1: {?s}", .{proxy.property1});
+    defer log.debug("proxy.property2: {?s}", .{proxy.property2});
 
     const o_owner = proxy.as(gio.DBusProxy).getNameOwner();
     if (o_owner) |owner| {
@@ -24,11 +27,11 @@ pub fn main() !void {
         glib.free(owner);
     } else {
         log.debug("proxy created without owner, waiting server...", .{});
+        _ = gobject.Object.signals.notify.connect(proxy, ?*anyopaque, onOwnerChange, null, .{ .detail = "g-name-owner" });
+        loop.run();
     }
 
-    _ = gobject.Object.signals.notify.connect(proxy, ?*anyopaque, onOwnerChange, null, .{ .detail = "g-name-owner" });
-
-    loop.run();
+    while (glib.MainContext.pending(glib.MainContext.default()) == 1) _ = glib.MainContext.iteration(null, @intFromBool(true));
 
     log.debug("Ending client", .{});
 }
@@ -51,8 +54,8 @@ fn callMethod(proxy: *DBusTest.Proxy) void {
         const child = result.getChildValue(0);
         defer child.unref();
         str = child.getString(null);
+        log.debug("proxy.Ping = {?s}", .{str});
     }
-    log.debug("proxy.Ping = {?s}", .{str});
 
     loop.quit();
 }

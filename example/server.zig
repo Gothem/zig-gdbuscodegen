@@ -13,7 +13,9 @@ pub fn main() !void {
     defer loop.unref();
 
     const dbus = DBusTest.Skeleton.new();
-    _ = gio.busOwnName(
+    defer dbus.unref();
+    defer dbus.as(gio.DBusInterfaceSkeleton).unexport();
+    const ownerid = gio.busOwnName(
         gio.BusType.session,
         "org.example.Test",
         .{},
@@ -23,17 +25,26 @@ pub fn main() !void {
         dbus,
         onUserDataDestroy,
     );
+    defer gio.busUnownName(ownerid);
 
     dbus.Ping = ping;
+    dbus.setproperty1("test");
+    const variant = glib.ext.Variant.newFrom("potato").refSink();
+    defer variant.unref();
+    dbus.setproperty2(variant);
 
     loop.run();
+
+    while (glib.MainContext.pending(glib.MainContext.default()) == 1) _ = glib.MainContext.iteration(null, @intFromBool(true));
 
     log.debug("Ending server", .{});
 }
 
-fn ping(_: *DBusTest.Skeleton, o_invocation: ?*gio.DBusMethodInvocation, msg: [*:0]const u8) void {
+fn ping(dbus: *DBusTest.Skeleton, o_invocation: ?*gio.DBusMethodInvocation, msg: [*:0]const u8) void {
     const invocation = o_invocation orelse return;
     log.debug("Ping = {s}", .{msg});
+
+    dbus.setproperty1("just checking");
 
     const variant = glib.ext.Variant.newFrom(.{"Pong"});
     invocation.returnValue(variant);

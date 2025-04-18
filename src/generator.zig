@@ -2,6 +2,7 @@ const std = @import("std");
 const translator = @import("translator.zig");
 
 const Interface = translator.Interface;
+const Property = translator.Property;
 const Access = translator.Access;
 
 pub fn start(allocator: std.mem.Allocator, interface: *Interface, output_dir: []const u8) !void {
@@ -266,10 +267,17 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
     for (interface.properties.items, 0..) |property, idx| {
         try writer.print(
             \\                if (info == dbus_info.f_properties.?[{d}]) {{
-            \\                    break :blk glib.ext.Variant.newFrom(priv.{s});
-            \\                }}
             \\
-        , .{ idx, property.nick });
+        , .{idx});
+        if (std.mem.eql(u8, property.zig_type, "[*:null]?[*:0]const u8")) {
+            try writer.print("{s:20}break :blk glib.Variant.newStrv(priv.{s},-1);\n", .{ "", property.nick });
+        } else {
+            try writer.print("{s:20}break :blk glib.ext.Variant.newFrom(priv.{s});\n", .{ "", property.nick });
+        }
+        _ = try writer.write(
+            \\                }
+            \\
+        );
     }
     _ = try writer.write(
         \\                unreachable;
@@ -381,7 +389,7 @@ fn writeMethods(writer: std.fs.File.Writer, interface: *Interface) !void {
         while (iter.next()) |arg| {
             try writer.print("{s}: {s}{s}", .{
                 arg.key_ptr.*,
-                if (getVariantFunctionByType(arg.value_ptr.zig_type).len == 0) "*glib.Variant" else arg.value_ptr.zig_type,
+                if (getVariantFunctionByType(arg.value_ptr.zig_type, false).len == 0) "*glib.Variant" else arg.value_ptr.zig_type,
                 if (idx == method.in_args.count()) "" else ", ",
             });
             idx += 1;
@@ -426,7 +434,7 @@ fn writeMethodCall(writer: std.fs.File.Writer, interface: *Interface) !void {
         try writer.print("            return interface.{s}.?(interface, p_invocation, ", .{method.name});
         for (method.in_args.values(), 1..) |arg, arg_idx| {
             const is_end = if (arg_idx == method.in_args.count()) "" else ", ";
-            try writer.print("v{d}{s}{s}", .{ arg_idx, getVariantFunctionByType(arg.zig_type), is_end });
+            try writer.print("v{d}{s}{s}", .{ arg_idx, getVariantFunctionByType(arg.zig_type, false), is_end });
         }
         _ = try writer.write(
             \\);
@@ -510,6 +518,7 @@ fn writeClass(writer: std.fs.File.Writer, interface: *Interface, isSkeleton: boo
         \\    pub const Class = extern struct {{
         \\        parent_class: Parent.Class,
         \\
+        \\        var parent: *Parent.Class = undefined;
         \\        pub const Instance = {s};
         \\
         \\        pub fn as(class: *Class, comptime T: type) *T {{
@@ -536,8 +545,9 @@ fn writeClass(writer: std.fs.File.Writer, interface: *Interface, isSkeleton: boo
             \\
             \\{s:12}gio.DBusProxy.virtual_methods.g_properties_changed.implement(class, onPropertyChanged);
             \\{s:12}gio.DBusProxy.virtual_methods.g_signal.implement(class, onSignal);
+            \\{s:12}gobject.Object.virtual_methods.finalize.implement(class, finalize);
             \\
-        , .{ "", "" });
+        , .{""} ** 3);
     }
 
     _ = try writer.write(
@@ -547,20 +557,33 @@ fn writeClass(writer: std.fs.File.Writer, interface: *Interface, isSkeleton: boo
     );
 }
 
-fn getVariantFunctionByType(zig_type: []const u8) []const u8 {
+fn getVariantFunctionByType(zig_type: []const u8, duplicate: bool) []const u8 {
     if (std.mem.eql(u8, zig_type, "[*:null]?[*:0]const u8")) {
-        return ".getStrv(null)";
+        return if (duplicate) ".dupStrv(null)" else ".getStrv(null)";
     } else if (std.mem.eql(u8, zig_type, "[*:0]const u8")) {
-        return ".getString(null)";
+        return if (duplicate) ".dupString(&size)" else ".getString(null)";
     } else if (std.mem.eql(u8, zig_type, "i32")) {
         return ".getInt32()";
     } else if (std.mem.eql(u8, zig_type, "u32")) {
         return ".getUint32()";
     } else if (std.mem.eql(u8, zig_type, "*glib.Variant")) {
-        return "";
+        return if (duplicate) ".ref()" else "";
     } else {
         std.debug.print("Type not found: {s}\n", .{zig_type});
         return "";
+    }
+}
+
+fn printFreeFunction(writer: std.fs.File.Writer, property: *const Property, spaces: u8) !void {
+    if (std.mem.eql(u8, property.zig_type, "*glib.Variant")) {
+        try writer.writeByteNTimes(' ', spaces);
+        try writer.print("if (proxy.{s}) |prop| prop.unref();\n", .{property.nick});
+    } else if (std.mem.eql(u8, property.zig_type, "[*:0]const u8")) {
+        try writer.writeByteNTimes(' ', spaces);
+        try writer.print("if (proxy.{s}) |prop| glib.free(@ptrCast(@constCast(prop)));\n", .{property.nick});
+    } else if (std.mem.eql(u8, property.zig_type, "[*:null]?[*:0]const u8")) {
+        try writer.writeByteNTimes(' ', spaces);
+        try writer.print("if (proxy.{s}) |prop| glib.strfreev(@ptrCast(@constCast(prop)));\n", .{property.nick});
     }
 }
 
@@ -577,7 +600,7 @@ fn writeVirtualMethods(writer: std.fs.File.Writer, interface: *Interface) !void 
         while (iter.next()) |arg| {
             try writer.print("{s}: {s}{s}", .{
                 arg.key_ptr.*,
-                if (getVariantFunctionByType(arg.value_ptr.zig_type).len == 0) "*glib.Variant" else arg.value_ptr.zig_type,
+                if (getVariantFunctionByType(arg.value_ptr.zig_type, false).len == 0) "*glib.Variant" else arg.value_ptr.zig_type,
                 if (idx == method.in_args.count()) "" else ", ",
             });
             if (std.mem.eql(u8, arg.value_ptr.signature, "as")) {
@@ -614,13 +637,23 @@ fn writeVirtualMethods(writer: std.fs.File.Writer, interface: *Interface) !void 
 }
 
 fn writeDBusSignals(writer: std.fs.File.Writer, interface: *Interface) !void {
+    _ = try writer.write("    fn finalize(proxy: *Proxy) callconv(.C) void {\n");
+    for (interface.properties.items) |property| {
+        try printFreeFunction(writer, &property, 8);
+    }
+    _ = try writer.write(
+        \\        gobject.Object.virtual_methods.finalize.call(Class.parent, proxy.as(Parent));
+        \\    }
+        \\
+    );
+
     try writer.print(
         \\
         \\{s:4}fn onPropertyChanged(proxy: *Proxy, p_changed_properties: *glib.Variant, _: *const [*:0]const u8) callconv(.C) void {{
         \\{s:8}updateProperties(proxy, p_changed_properties);
         \\{s:4}}}
         \\
-    , .{ "", "", "" });
+    , .{""} ** 3);
 
     try writer.print(
         \\
@@ -665,7 +698,7 @@ fn writeDBusSignals(writer: std.fs.File.Writer, interface: *Interface) !void {
         for (signal.args.items, 0..) |arg, arg_idx| {
             try writer.print("params[{d}]{s}{s}", .{
                 arg_idx,
-                getVariantFunctionByType(arg.zig_type),
+                getVariantFunctionByType(arg.zig_type, false),
                 if (arg_idx == signal.args.items.len - 1) "" else ", ",
             });
         }
@@ -695,10 +728,19 @@ fn writeUpdateProperties(writer: std.fs.File.Writer, interface: *Interface) !voi
         \\        var key: [*:0]const u8 = undefined;
         \\        var variant: *glib.Variant = undefined;
         \\        while (iter.next("{&sv}", &key, &variant) != 0) {
-        \\            const info = getInfo().lookupProperty(key);
-        \\            if (info == null) continue;
+        \\            defer variant.unref();
+        \\            const info = getInfo().lookupProperty(key) orelse continue;
         \\
     );
+
+    var printSize = false;
+    for (interface.properties.items) |property| {
+        if (std.mem.eql(u8, property.zig_type, "[*:0]const u8")) {
+            printSize = true;
+            break;
+        }
+    }
+    if (printSize) try writer.print("\n{s:12}var size = variant.getSize();", .{""});
 
     for (interface.properties.items, 0..) |property, idx| {
         if (idx == 0) {
@@ -711,7 +753,12 @@ fn writeUpdateProperties(writer: std.fs.File.Writer, interface: *Interface) !voi
         if (property.signature.len == 1 and property.signature[0] == 'b') {
             try writer.print("{s:16}proxy.{s} = (variant.getBoolean() == 1);\n", .{ "", property.nick });
         } else {
-            try writer.print("{s:16}proxy.{s} = variant{s};\n", .{ "", property.nick, getVariantFunctionByType(property.zig_type) });
+            try printFreeFunction(writer, &property, 16);
+            if (std.mem.eql(u8, property.zig_type, "[*:null]?[*:0]const u8")) {
+                try writer.print("{s:16}proxy.{s} = @ptrCast(variant{s});\n", .{ "", property.nick, getVariantFunctionByType(property.zig_type, true) });
+            } else {
+                try writer.print("{s:16}proxy.{s} = variant{s};\n", .{ "", property.nick, getVariantFunctionByType(property.zig_type, true) });
+            }
         }
         try writer.print("{s:12}}}", .{""});
     }
@@ -738,6 +785,7 @@ fn writeProxy(writer: std.fs.File.Writer, interface: *Interface) !void {
     try writer.print("\n{s:8}.name = \"{s}Proxy\",\n", .{ "", interface.name });
     _ = try writer.write(
         \\        .classInit = &Class.init,
+        \\        .parent_class = &Class.parent,
         \\    });
         \\
         \\    pub fn as(interface: *Proxy, comptime T: type) *T {
