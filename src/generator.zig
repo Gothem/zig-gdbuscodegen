@@ -249,6 +249,54 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
         \\    extern fn g_object_unref(p_self: *Skeleton) void;
         \\    pub const unref = g_object_unref;
         \\
+        \\    fn emitChanges(self: *Skeleton, changed_fields: []const []const u8) void {
+        \\        const connections = self.as(gio.DBusInterfaceSkeleton).getConnections();
+        \\        defer connections.freeFull(@ptrCast(&gobject.Object.unref));
+        \\        const object_path = self.as(gio.DBusInterfaceSkeleton).getObjectPath() orelse return;
+        \\        const builder = glib.VariantBuilder.new(@ptrCast("a{sv}"));
+        \\        defer builder.unref();
+        \\        const invalid = glib.VariantBuilder.new(@ptrCast("as"));
+        \\        defer invalid.unref();
+        \\        for (changed_fields) |field| {
+        \\            const info = dbus_info.lookupProperty(@ptrCast(field)) orelse continue;
+        \\            const priv = self.private();
+        \\            const variant: *glib.Variant = blk: {
+        \\
+    );
+    for (interface.properties.items, 0..) |property, idx| {
+        try writer.print(
+            \\                if (info == dbus_info.f_properties.?[{d}]) {{
+            \\                    break :blk glib.ext.Variant.newFrom(priv.{s});
+            \\                }}
+            \\
+        , .{ idx, property.nick });
+    }
+    _ = try writer.write(
+        \\                unreachable;
+        \\            };
+        \\            builder.add("{sv}", field.ptr, variant);
+        \\        }
+        \\        const v_signal_parameters = glib.Variant.new(
+        \\            "(sa{sv}as)",
+        \\            dbus_info.f_name,
+        \\            builder,
+        \\            invalid,
+        \\        ).refSink();
+        \\        defer v_signal_parameters.unref();
+        \\        var it: ?*glib.List = connections;
+        \\        while (it) |node| : (it = node.f_next) {
+        \\            const connection: *gio.DBusConnection = @ptrCast(node.f_data);
+        \\            _ = connection.emitSignal(
+        \\                null,
+        \\                object_path,
+        \\                "org.freedesktop.DBus.Properties",
+        \\                "PropertiesChanged",
+        \\                v_signal_parameters,
+        \\                null,
+        \\            );
+        \\        }
+        \\    }
+        \\
     );
 
     try writeMethodCall(writer, interface);
@@ -271,6 +319,8 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
             \\        priv.lock.lock();
             \\        priv.{s} = value;
             \\        priv.lock.unlock();
+            \\
+            \\        self.emitChanges(&[_][]const u8{{"{s}"}});
             \\    }}
             \\
             \\    pub fn get{s}(self: *Skeleton) {s} {{
@@ -281,7 +331,7 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
             \\    }}
             \\
             \\
-        , .{ property.function_name, property.zig_type, property.nick, property.function_name, property.zig_type, property.nick });
+        , .{ property.function_name, property.zig_type, property.nick, property.nick, property.function_name, property.zig_type, property.nick });
     }
 
     try writeClass(writer, interface, true);
