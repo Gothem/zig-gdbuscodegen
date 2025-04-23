@@ -649,13 +649,17 @@ fn writeFinalize(writer: std.fs.File.Writer, interface: *Interface, isSkeleton: 
         if (isSkeleton) "interface" else "proxy",
         if (isSkeleton) "Skeleton" else "Proxy",
     });
-    if (isSkeleton) _ = try writer.write("        const priv = interface.private();\n");
 
+    var priv_printed = false;
     for (interface.properties.items) |property| {
         if (!isSkeleton) {
             try printFreeFunction(writer, &property, 8);
         } else if (std.mem.eql(u8, property.zig_type, "[*:null]?[*:0]const u8")) {
-            _ = try writer.write("        glib.strfreev(@ptrCast(@constCast(priv.property_as)));\n");
+            if (!priv_printed) {
+                _ = try writer.write("        const priv = interface.private();\n");
+                priv_printed = true;
+            }
+            try writer.print("        glib.strfreev(@ptrCast(@constCast(priv.{s})));\n", .{property.nick});
         }
     }
     _ = try writer.print(
