@@ -19,6 +19,11 @@ pub fn main() !void {
     defer proxy.unref();
     defer log.debug("proxy.property1: {?s}", .{proxy.property1});
     defer log.debug("proxy.property2: {?s}", .{proxy.property2});
+    defer {
+        for (std.mem.span(proxy.property_as.?), 0..) |str, i| {
+            log.debug("proxy.property_as[{d}]: {?s}", .{ i, str });
+        }
+    }
 
     const o_owner = proxy.as(gio.DBusProxy).getNameOwner();
     if (o_owner) |owner| {

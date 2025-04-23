@@ -15,5 +15,6 @@
     <!-- properties -->
     <property name="property1" type="s" access="readwrite"/>
     <property name="property2" type="v" access="readwrite"/>
+    <property name="property_as" type="as" access="readwrite"/>
   </interface>
 </node>

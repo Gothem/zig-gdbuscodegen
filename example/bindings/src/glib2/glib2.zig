@@ -13471,7 +13471,7 @@ pub const Variant = opaque {
     /// strings.
     ///
     /// If `length` is -1 then `strv` is `NULL`-terminated.
-    extern fn g_variant_new_strv(p_strv: [*]const [*:0]const u8, p_length: isize) *glib.Variant;
+    extern fn g_variant_new_strv(p_strv: [*]const ?[*:0]const u8, p_length: isize) *glib.Variant;
     pub const newStrv = g_variant_new_strv;
 
     /// Creates a string `glib.Variant` with the contents of `string`.
@@ -13674,7 +13674,7 @@ pub const Variant = opaque {
     ///
     /// For an empty array, `length` will be set to 0 and a pointer to a
     /// `NULL` pointer will be returned.
-    extern fn g_variant_dup_strv(p_value: *Variant, p_length: ?*usize) [*:null]?[*:0]u8;
+    extern fn g_variant_dup_strv(p_value: *Variant, p_length: ?*usize) [*:null]?[*:0]const u8;
     pub const dupStrv = g_variant_dup_strv;
 
     /// Checks if `one` and `two` have the same type and value.
@@ -23016,7 +23016,7 @@ pub const strescape = g_strescape;
 /// Frees an array of strings, as well as each string it contains.
 ///
 /// If `str_array` is `NULL`, this function simply returns.
-extern fn g_strfreev(p_str_array: ?[*][*:0]u8) void;
+extern fn g_strfreev(p_str_array: ?[*]?[*:0]const u8) void;
 pub const strfreev = g_strfreev;
 
 /// An auxiliary function for `gettext` support (see `Q_`).

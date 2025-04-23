@@ -203,11 +203,12 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
     );
 
     try writePrivate(writer, interface);
-
+    try writeFinalize(writer, interface, true);
     _ = try writer.write(
         \\    pub const getGObjectType = gobject.ext.defineClass(Skeleton, .{
         \\        .instanceInit = &init,
         \\        .classInit = &Class.init,
+        \\        .parent_class = &Class.parent,
         \\        .private = .{ .Type = Private, .offset = &Private.offset },
         \\    });
         \\
@@ -325,6 +326,13 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
             \\    pub fn set{s}(self: *Skeleton, value: {s}) void {{
             \\        const priv = self.private();
             \\        priv.lock.lock();
+            \\
+        , .{ property.function_name, property.zig_type });
+
+        if (std.mem.eql(u8, property.signature, "as"))
+            try writer.print("        glib.strfreev(priv.{s});\n", .{property.nick});
+
+        try writer.print(
             \\        priv.{s} = value;
             \\        priv.lock.unlock();
             \\
@@ -339,7 +347,7 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
             \\    }}
             \\
             \\
-        , .{ property.function_name, property.zig_type, property.nick, property.nick, property.function_name, property.zig_type, property.nick });
+        , .{ property.nick, property.nick, property.function_name, property.zig_type, property.nick });
     }
 
     try writeClass(writer, interface, true);
@@ -545,10 +553,10 @@ fn writeClass(writer: std.fs.File.Writer, interface: *Interface, isSkeleton: boo
             \\
             \\{s:12}gio.DBusProxy.virtual_methods.g_properties_changed.implement(class, onPropertyChanged);
             \\{s:12}gio.DBusProxy.virtual_methods.g_signal.implement(class, onSignal);
-            \\{s:12}gobject.Object.virtual_methods.finalize.implement(class, finalize);
             \\
-        , .{""} ** 3);
+        , .{""} ** 2);
     }
+    _ = try writer.write("            gobject.Object.virtual_methods.finalize.implement(class, finalize);\n");
 
     _ = try writer.write(
         \\        }
@@ -636,17 +644,28 @@ fn writeVirtualMethods(writer: std.fs.File.Writer, interface: *Interface) !void 
     }
 }
 
-fn writeDBusSignals(writer: std.fs.File.Writer, interface: *Interface) !void {
-    _ = try writer.write("    fn finalize(proxy: *Proxy) callconv(.C) void {\n");
-    for (interface.properties.items) |property| {
-        try printFreeFunction(writer, &property, 8);
-    }
-    _ = try writer.write(
-        \\        gobject.Object.virtual_methods.finalize.call(Class.parent, proxy.as(Parent));
-        \\    }
-        \\
-    );
+fn writeFinalize(writer: std.fs.File.Writer, interface: *Interface, isSkeleton: bool) !void {
+    try writer.print("    fn finalize({s}: *{s}) callconv(.C) void {{\n", .{
+        if (isSkeleton) "interface" else "proxy",
+        if (isSkeleton) "Skeleton" else "Proxy",
+    });
+    if (isSkeleton) _ = try writer.write("        const priv = interface.private();\n");
 
+    for (interface.properties.items) |property| {
+        if (!isSkeleton) {
+            try printFreeFunction(writer, &property, 8);
+        } else if (std.mem.eql(u8, property.zig_type, "[*:null]?[*:0]const u8")) {
+            _ = try writer.write("        glib.strfreev(@ptrCast(@constCast(priv.property_as)));\n");
+        }
+    }
+    _ = try writer.print(
+        \\        gobject.Object.virtual_methods.finalize.call(Class.parent, {s}.as(Parent));
+        \\    }}
+        \\
+    , .{if (isSkeleton) "interface" else "proxy"});
+}
+
+fn writeDBusSignals(writer: std.fs.File.Writer, interface: *Interface) !void {
     try writer.print(
         \\
         \\{s:4}fn onPropertyChanged(proxy: *Proxy, p_changed_properties: *glib.Variant, _: *const [*:0]const u8) callconv(.C) void {{
@@ -817,6 +836,7 @@ fn writeProxy(writer: std.fs.File.Writer, interface: *Interface) !void {
     try writeVirtualMethods(writer, interface);
     try writeSignals(writer, interface, false);
     try writeClass(writer, interface, false);
+    try writeFinalize(writer, interface, false);
     try writeDBusSignals(writer, interface);
     try writeUpdateProperties(writer, interface);
 

@@ -33,10 +33,21 @@ pub fn main() !void {
     defer variant.unref();
     dbus.setproperty2(variant);
 
+    var builder: glib.VariantBuilder = undefined;
+    glib.VariantBuilder.initStatic(&builder, glib.VariantType.checked("as"));
+    builder.add("s", "test1");
+    const variant_as = builder.end();
+    defer variant_as.unref();
+    const items = variant_as.dupStrv(null);
+    dbus.setproperty_as(items);
+
     loop.run();
 
     while (glib.MainContext.pending(glib.MainContext.default()) == 1) _ = glib.MainContext.iteration(null, @intFromBool(true));
 
+    for (std.mem.span(dbus.getproperty_as()), 0..) |str, i| {
+        log.debug("property_as[{d}]: {?s}", .{ i, str });
+    }
     log.debug("Ending server", .{});
 }
 
@@ -45,6 +56,19 @@ fn ping(dbus: *DBusTest.Skeleton, o_invocation: ?*gio.DBusMethodInvocation, msg:
     log.debug("Ping = {s}", .{msg});
 
     dbus.setproperty1("just checking");
+
+    var builder: glib.VariantBuilder = undefined;
+    glib.VariantBuilder.initStatic(&builder, glib.VariantType.checked("as"));
+    builder.add("s", "test2");
+    const old_items = dbus.getproperty_as();
+    var i: usize = 0;
+    while (old_items[i] != null) : (i += 1) {
+        builder.add("s", old_items[i]);
+    }
+    const variant_as = builder.end();
+    defer variant_as.unref();
+    const items = variant_as.dupStrv(null);
+    dbus.setproperty_as(items);
 
     const variant = glib.ext.Variant.newFrom(.{"Pong"});
     invocation.returnValue(variant);
