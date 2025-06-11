@@ -330,7 +330,7 @@ fn writeSkeleton(writer: std.fs.File.Writer, interface: *Interface) !void {
         , .{ property.function_name, property.zig_type });
 
         if (std.mem.eql(u8, property.signature, "as"))
-            try writer.print("        glib.strfreev(priv.{s});\n", .{property.nick});
+            try writer.print("        glib.strfreev(@ptrCast(priv.{s}));\n", .{property.nick});
 
         try writer.print(
             \\        priv.{s} = value;

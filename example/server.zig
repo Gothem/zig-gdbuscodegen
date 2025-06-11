@@ -39,7 +39,7 @@ pub fn main() !void {
     const variant_as = builder.end();
     defer variant_as.unref();
     const items = variant_as.dupStrv(null);
-    dbus.setproperty_as(items);
+    dbus.setproperty_as(@ptrCast(items));
 
     loop.run();
 
@@ -68,7 +68,7 @@ fn ping(dbus: *DBusTest.Skeleton, o_invocation: ?*gio.DBusMethodInvocation, msg:
     const variant_as = builder.end();
     defer variant_as.unref();
     const items = variant_as.dupStrv(null);
-    dbus.setproperty_as(items);
+    dbus.setproperty_as(@ptrCast(items));
 
     const variant = glib.ext.Variant.newFrom(.{"Pong"});
     invocation.returnValue(variant);
