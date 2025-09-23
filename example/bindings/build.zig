@@ -76,9 +76,11 @@ pub const CompileResources = struct {
         const run = cr.b.addRunArtifact(build_gresources_xml_exe orelse exe: {
             const exe = cr.b.addExecutable(.{
                 .name = "build-gresources-xml",
-                .root_source_file = cr.b.path("build/build_gresources_xml.zig"),
-                .target = cr.b.graph.host,
-                .optimize = .Debug,
+                .root_module = cr.b.createModule(.{
+                    .root_source_file = cr.b.path("build/build_gresources_xml.zig"),
+                    .target = cr.b.graph.host,
+                    .optimize = .Debug,
+                }),
             });
             build_gresources_xml_exe = exe;
             break :exe exe;
@@ -200,8 +202,20 @@ pub fn build(b: *std.Build) void {
     libraries.glib2.linkTo(glib2);
     glib2.addImport("compat", compat);
 
+    const glib2_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/glib2/glib2.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    libraries.glib2.linkTo(glib2_test_mod);
+    libraries.gobject2.linkTo(glib2_test_mod);
+    // Some deprecated thread functions require linking gthread-2.0
+    glib2_test_mod.linkSystemLibrary("gthread-2.0", .{ .use_pkg_config = .force });
+    glib2_test_mod.addImport("compat", compat);
+    glib2_test_mod.addImport("glib2", glib2_test_mod);
+
     const glib2_test = b.addTest(.{
-        .root_module = glib2,
+        .root_module = glib2_test_mod,
     });
     test_step.dependOn(&b.addRunArtifact(glib2_test).step);
 
@@ -250,7 +264,7 @@ pub fn build(b: *std.Build) void {
 
 pub const libraries = struct {
     pub const gio2: Library = .{
-        .system_libraries = &.{ "gio-2.0", "gio-unix-2.0" },
+        .system_libraries = &.{"gio-2.0"},
     };
 
     pub const gobject2: Library = .{

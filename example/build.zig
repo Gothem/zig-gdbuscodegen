@@ -20,9 +20,11 @@ pub fn build(b: *std.Build) void {
     });
     const server_exe = b.addExecutable(.{
         .name = "example-server",
-        .root_source_file = b.path("server.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("server.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     server_exe.root_module.addImport("glib", glib);
@@ -32,9 +34,11 @@ pub fn build(b: *std.Build) void {
 
     const client_exe = b.addExecutable(.{
         .name = "example-client",
-        .root_source_file = b.path("client.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("client.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     client_exe.root_module.addImport("glib", glib);
     client_exe.root_module.addImport("gobject", gobject);

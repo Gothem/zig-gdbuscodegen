@@ -17,8 +17,8 @@ pub fn main() !void {
     defer connection.unref();
     const proxy = DBusTest.Proxy.newSync(connection, .{}, "org.example.Test", "/Test", null, null) orelse @panic("Proxy failed");
     defer proxy.unref();
-    defer log.debug("proxy.property1: {?s}", .{proxy.property1});
-    defer log.debug("proxy.property2: {?s}", .{proxy.property2});
+    defer log.debug("proxy.property1: {?*}", .{proxy.property1});
+    defer log.debug("proxy.property2: {?*}", .{proxy.property2});
     defer {
         for (std.mem.span(proxy.property_as.?), 0..) |str, i| {
             log.debug("proxy.property_as[{d}]: {?s}", .{ i, str });
@@ -41,7 +41,7 @@ pub fn main() !void {
     log.debug("Ending client", .{});
 }
 
-fn onOwnerChange(proxy: *DBusTest.Proxy, _: *gobject.ParamSpec, _: ?*anyopaque) callconv(.C) void {
+fn onOwnerChange(proxy: *DBusTest.Proxy, _: *gobject.ParamSpec, _: ?*anyopaque) callconv(.c) void {
     const o_owner = proxy.as(gio.DBusProxy).getNameOwner();
     log.debug("proxy owner changed: {?s}", .{o_owner});
 

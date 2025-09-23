@@ -25,11 +25,11 @@ const gmodule = @import("gmodule2");
 ///  - `gio.AppInfo.getDefaultForType`
 ///  - `gio.AppInfo.getFallbackForType`
 ///  - `gio.AppInfo.getRecommendedForType`
-///  - [``gio.DesktopAppInfo.getImplementations``](../gio-unix/type_func.DesktopAppInfo.get_implementation.html)
-///  - [``gio.DesktopAppInfo.new``](../gio-unix/ctor.DesktopAppInfo.new.html)
-///  - [``gio.DesktopAppInfo.newFromFilename``](../gio-unix/ctor.DesktopAppInfo.new_from_filename.html)
-///  - [``gio.DesktopAppInfo.newFromKeyfile``](../gio-unix/ctor.DesktopAppInfo.new_from_keyfile.html)
-///  - [``gio.DesktopAppInfo.search``](../gio-unix/type_func.DesktopAppInfo.search.html)
+///  - [``g_desktop_app_info_get_implementations``](../gio-unix/type_func.DesktopAppInfo.get_implementation.html)
+///  - [``g_desktop_app_info_new``](../gio-unix/ctor.DesktopAppInfo.new.html)
+///  - [``g_desktop_app_info_new_from_filename``](../gio-unix/ctor.DesktopAppInfo.new_from_filename.html)
+///  - [``g_desktop_app_info_new_from_keyfile``](../gio-unix/ctor.DesktopAppInfo.new_from_keyfile.html)
+///  - [``g_desktop_app_info_search``](../gio-unix/type_func.DesktopAppInfo.search.html)
 ///
 /// The latter functions are available if using
 /// [`GDesktopAppInfo`](../gio-unix/class.DesktopAppInfo.html) from
@@ -504,7 +504,7 @@ pub const Application = extern struct {
         };
 
         /// invoked (locally) to add 'platform data' to be sent to
-        ///     the primary instance when activating, opening or invoking actions
+        ///     the primary instance when activating, opening or invoking actions. Must chain up
         pub const add_platform_data = struct {
             pub fn call(p_class: anytype, p_application: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_builder: *glib.VariantBuilder) void {
                 return gobject.ext.as(Application.Class, p_class).f_add_platform_data.?(gobject.ext.as(Application, p_application), p_builder);
@@ -517,7 +517,7 @@ pub const Application = extern struct {
 
         /// invoked on the primary instance after 'activate', 'open',
         ///     'command-line' or any action invocation, gets the 'platform data' from
-        ///     the calling instance
+        ///     the calling instance. Must chain up
         pub const after_emit = struct {
             pub fn call(p_class: anytype, p_application: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_platform_data: *glib.Variant) void {
                 return gobject.ext.as(Application.Class, p_class).f_after_emit.?(gobject.ext.as(Application, p_application), p_platform_data);
@@ -530,7 +530,7 @@ pub const Application = extern struct {
 
         /// invoked on the primary instance before 'activate', 'open',
         ///     'command-line' or any action invocation, gets the 'platform data' from
-        ///     the calling instance
+        ///     the calling instance. Must chain up
         pub const before_emit = struct {
             pub fn call(p_class: anytype, p_application: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_platform_data: *glib.Variant) void {
                 return gobject.ext.as(Application.Class, p_class).f_before_emit.?(gobject.ext.as(Application, p_application), p_platform_data);
@@ -4573,7 +4573,7 @@ pub const DBusMessage = opaque {
     pub const getInterface = g_dbus_message_get_interface;
 
     /// Checks whether `message` is locked. To monitor changes to this
-    /// value, conncet to the `gobject.Object.signals.notify` signal to listen for changes
+    /// value, connect to the `gobject.Object.signals.notify` signal to listen for changes
     /// on the `gio.DBusMessage.properties.locked` property.
     extern fn g_dbus_message_get_locked(p_message: *DBusMessage) c_int;
     pub const getLocked = g_dbus_message_get_locked;
@@ -6905,255 +6905,6 @@ pub const DebugControllerDBus = extern struct {
     }
 };
 
-/// `GDesktopAppInfo` is an implementation of `gio.AppInfo` based on
-/// desktop files.
-///
-/// Note that `<gio/gdesktopappinfo.h>` belongs to the UNIX-specific
-/// GIO interfaces, thus you have to use the `gio-unix-2.0.pc` pkg-config
-/// file or the `GioUnix-2.0` GIR namespace when using it.
-pub const DesktopAppInfo = opaque {
-    pub const Parent = gobject.Object;
-    pub const Implements = [_]type{gio.AppInfo};
-    pub const Class = gio.DesktopAppInfoClass;
-    pub const virtual_methods = struct {};
-
-    pub const properties = struct {
-        /// The origin filename of this `gio.DesktopAppInfo`
-        pub const filename = struct {
-            pub const name = "filename";
-
-            pub const Type = ?[*:0]u8;
-        };
-    };
-
-    pub const signals = struct {};
-
-    /// Gets all applications that implement `interface`.
-    ///
-    /// An application implements an interface if that interface is listed in
-    /// the `Implements` line of the desktop file of the application.
-    extern fn g_desktop_app_info_get_implementations(p_interface: [*:0]const u8) *glib.List;
-    pub const getImplementations = g_desktop_app_info_get_implementations;
-
-    /// Searches desktop files for ones that match `search_string`.
-    ///
-    /// The return value is an array of strvs.  Each strv contains a list of
-    /// applications that matched `search_string` with an equal score.  The
-    /// outer list is sorted by score so that the first strv contains the
-    /// best-matching applications, and so on.
-    /// The algorithm for determining matches is undefined and may change at
-    /// any time.
-    ///
-    /// None of the search results are subjected to the normal validation
-    /// checks performed by `gio.DesktopAppInfo.new` (for example, checking that
-    /// the executable referenced by a result exists), and so it is possible for
-    /// `gio.DesktopAppInfo.new` to return `NULL` when passed an app ID returned
-    /// by this function. It is expected that calling code will do this when
-    /// subsequently creating a `gio.DesktopAppInfo` for each result.
-    extern fn g_desktop_app_info_search(p_search_string: [*:0]const u8) [*][*][*:0]u8;
-    pub const search = g_desktop_app_info_search;
-
-    /// Sets the name of the desktop that the application is running in.
-    ///
-    /// This is used by `gio.AppInfo.shouldShow` and
-    /// `gio.DesktopAppInfo.getShowIn` to evaluate the
-    /// [`OnlyShowIn`](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s06.html`key`-onlyshowin)
-    /// and [`NotShowIn`](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s06.html`key`-notshowin)
-    /// keys.
-    ///
-    /// Should be called only once; subsequent calls are ignored.
-    extern fn g_desktop_app_info_set_desktop_env(p_desktop_env: [*:0]const u8) void;
-    pub const setDesktopEnv = g_desktop_app_info_set_desktop_env;
-
-    /// Creates a new `gio.DesktopAppInfo` based on a desktop file ID.
-    ///
-    /// A desktop file ID is the basename of the desktop file, including the
-    /// `.desktop` extension. GIO is looking for a desktop file with this name
-    /// in the `applications` subdirectories of the XDG
-    /// data directories (i.e. the directories specified in the `XDG_DATA_HOME`
-    /// and `XDG_DATA_DIRS` environment variables). GIO also supports the
-    /// prefix-to-subdirectory mapping that is described in the
-    /// [Menu Spec](http://standards.freedesktop.org/menu-spec/latest/)
-    /// (i.e. a desktop ID of `kde-foo.desktop` will match
-    /// `/usr/share/applications/kde/foo.desktop`).
-    extern fn g_desktop_app_info_new(p_desktop_id: [*:0]const u8) ?*gio.DesktopAppInfo;
-    pub const new = g_desktop_app_info_new;
-
-    /// Creates a new `gio.DesktopAppInfo`.
-    extern fn g_desktop_app_info_new_from_filename(p_filename: [*:0]const u8) ?*gio.DesktopAppInfo;
-    pub const newFromFilename = g_desktop_app_info_new_from_filename;
-
-    /// Creates a new `gio.DesktopAppInfo`.
-    extern fn g_desktop_app_info_new_from_keyfile(p_key_file: *glib.KeyFile) ?*gio.DesktopAppInfo;
-    pub const newFromKeyfile = g_desktop_app_info_new_from_keyfile;
-
-    /// Gets the user-visible display name of the
-    /// [‘additional application actions’](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html)
-    /// specified by `action_name`.
-    ///
-    /// This corresponds to the `Name` key within the keyfile group for the
-    /// action.
-    extern fn g_desktop_app_info_get_action_name(p_info: *DesktopAppInfo, p_action_name: [*:0]const u8) [*:0]u8;
-    pub const getActionName = g_desktop_app_info_get_action_name;
-
-    /// Looks up a boolean value in the keyfile backing `info`.
-    ///
-    /// The `key` is looked up in the `Desktop Entry` group.
-    extern fn g_desktop_app_info_get_boolean(p_info: *DesktopAppInfo, p_key: [*:0]const u8) c_int;
-    pub const getBoolean = g_desktop_app_info_get_boolean;
-
-    /// Gets the categories from the desktop file.
-    extern fn g_desktop_app_info_get_categories(p_info: *DesktopAppInfo) ?[*:0]const u8;
-    pub const getCategories = g_desktop_app_info_get_categories;
-
-    /// When `info` was created from a known filename, return it.  In some
-    /// situations such as a `gio.DesktopAppInfo` returned from
-    /// `gio.DesktopAppInfo.newFromKeyfile`, this function will return `NULL`.
-    extern fn g_desktop_app_info_get_filename(p_info: *DesktopAppInfo) ?[*:0]const u8;
-    pub const getFilename = g_desktop_app_info_get_filename;
-
-    /// Gets the generic name from the desktop file.
-    extern fn g_desktop_app_info_get_generic_name(p_info: *DesktopAppInfo) ?[*:0]const u8;
-    pub const getGenericName = g_desktop_app_info_get_generic_name;
-
-    /// A desktop file is hidden if the
-    /// [`Hidden` key](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s06.html`key`-hidden)
-    /// in it is set to `True`.
-    extern fn g_desktop_app_info_get_is_hidden(p_info: *DesktopAppInfo) c_int;
-    pub const getIsHidden = g_desktop_app_info_get_is_hidden;
-
-    /// Gets the keywords from the desktop file.
-    extern fn g_desktop_app_info_get_keywords(p_info: *DesktopAppInfo) [*]const [*:0]const u8;
-    pub const getKeywords = g_desktop_app_info_get_keywords;
-
-    /// Looks up a localized string value in the keyfile backing `info`
-    /// translated to the current locale.
-    ///
-    /// The `key` is looked up in the `Desktop Entry` group.
-    extern fn g_desktop_app_info_get_locale_string(p_info: *DesktopAppInfo, p_key: [*:0]const u8) ?[*:0]u8;
-    pub const getLocaleString = g_desktop_app_info_get_locale_string;
-
-    /// Gets the value of the
-    /// [`NoDisplay` key](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s06.html`key`-nodisplay)
-    ///  which helps determine if the application info should be shown in menus. See
-    /// `G_KEY_FILE_DESKTOP_KEY_NO_DISPLAY` and `gio.AppInfo.shouldShow`.
-    extern fn g_desktop_app_info_get_nodisplay(p_info: *DesktopAppInfo) c_int;
-    pub const getNodisplay = g_desktop_app_info_get_nodisplay;
-
-    /// Checks if the application info should be shown in menus that list available
-    /// applications for a specific name of the desktop, based on the
-    /// [`OnlyShowIn`](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s06.html`key`-onlyshowin)
-    /// and [`NotShowIn`](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s06.html`key`-notshowin)
-    /// keys.
-    ///
-    /// `desktop_env` should typically be given as `NULL`, in which case the
-    /// `XDG_CURRENT_DESKTOP` environment variable is consulted.  If you want
-    /// to override the default mechanism then you may specify `desktop_env`,
-    /// but this is not recommended.
-    ///
-    /// Note that `gio.AppInfo.shouldShow` for `info` will include this check
-    /// (with `NULL` for `desktop_env`) as well as additional checks.
-    extern fn g_desktop_app_info_get_show_in(p_info: *DesktopAppInfo, p_desktop_env: ?[*:0]const u8) c_int;
-    pub const getShowIn = g_desktop_app_info_get_show_in;
-
-    /// Retrieves the `StartupWMClass` field from `info`. This represents the
-    /// `WM_CLASS` property of the main window of the application, if launched
-    /// through `info`.
-    extern fn g_desktop_app_info_get_startup_wm_class(p_info: *DesktopAppInfo) ?[*:0]const u8;
-    pub const getStartupWmClass = g_desktop_app_info_get_startup_wm_class;
-
-    /// Looks up a string value in the keyfile backing `info`.
-    ///
-    /// The `key` is looked up in the `Desktop Entry` group.
-    extern fn g_desktop_app_info_get_string(p_info: *DesktopAppInfo, p_key: [*:0]const u8) ?[*:0]u8;
-    pub const getString = g_desktop_app_info_get_string;
-
-    /// Looks up a string list value in the keyfile backing `info`.
-    ///
-    /// The `key` is looked up in the `Desktop Entry` group.
-    extern fn g_desktop_app_info_get_string_list(p_info: *DesktopAppInfo, p_key: [*:0]const u8, p_length: ?*usize) [*:null]?[*:0]u8;
-    pub const getStringList = g_desktop_app_info_get_string_list;
-
-    /// Returns whether `key` exists in the `Desktop Entry` group
-    /// of the keyfile backing `info`.
-    extern fn g_desktop_app_info_has_key(p_info: *DesktopAppInfo, p_key: [*:0]const u8) c_int;
-    pub const hasKey = g_desktop_app_info_has_key;
-
-    /// Activates the named application action.
-    ///
-    /// You may only call this function on action names that were
-    /// returned from `gio.DesktopAppInfo.listActions`.
-    ///
-    /// Note that if the main entry of the desktop file indicates that the
-    /// application supports startup notification, and `launch_context` is
-    /// non-`NULL`, then startup notification will be used when activating the
-    /// action (and as such, invocation of the action on the receiving side
-    /// must signal the end of startup notification when it is completed).
-    /// This is the expected behaviour of applications declaring additional
-    /// actions, as per the
-    /// [desktop file specification](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html).
-    ///
-    /// As with `gio.AppInfo.launch` there is no way to detect failures that
-    /// occur while using this function.
-    extern fn g_desktop_app_info_launch_action(p_info: *DesktopAppInfo, p_action_name: [*:0]const u8, p_launch_context: ?*gio.AppLaunchContext) void;
-    pub const launchAction = g_desktop_app_info_launch_action;
-
-    /// This function performs the equivalent of `gio.AppInfo.launchUris`,
-    /// but is intended primarily for operating system components that
-    /// launch applications.  Ordinary applications should use
-    /// `gio.AppInfo.launchUris`.
-    ///
-    /// If the application is launched via GSpawn, then `spawn_flags`, `user_setup`
-    /// and `user_setup_data` are used for the call to `glib.spawnAsync`.
-    /// Additionally, `pid_callback` (with `pid_callback_data`) will be called to
-    /// inform about the PID of the created process. See
-    /// `glib.spawnAsyncWithPipes` for information on certain parameter
-    /// conditions that can enable an optimized [``posix_spawn``](man:posix_spawn(3))
-    /// code path to be used.
-    ///
-    /// If application launching occurs via some other mechanism (for example, D-Bus
-    /// activation) then `spawn_flags`, `user_setup`, `user_setup_data`,
-    /// `pid_callback` and `pid_callback_data` are ignored.
-    extern fn g_desktop_app_info_launch_uris_as_manager(p_appinfo: *DesktopAppInfo, p_uris: *glib.List, p_launch_context: ?*gio.AppLaunchContext, p_spawn_flags: glib.SpawnFlags, p_user_setup: ?glib.SpawnChildSetupFunc, p_user_setup_data: ?*anyopaque, p_pid_callback: ?gio.DesktopAppLaunchCallback, p_pid_callback_data: ?*anyopaque, p_error: ?*?*glib.Error) c_int;
-    pub const launchUrisAsManager = g_desktop_app_info_launch_uris_as_manager;
-
-    /// Equivalent to `gio.DesktopAppInfo.launchUrisAsManager` but allows
-    /// you to pass in file descriptors for the stdin, stdout and stderr streams
-    /// of the launched process.
-    ///
-    /// If application launching occurs via some non-spawn mechanism (e.g. D-Bus
-    /// activation) then `stdin_fd`, `stdout_fd` and `stderr_fd` are ignored.
-    extern fn g_desktop_app_info_launch_uris_as_manager_with_fds(p_appinfo: *DesktopAppInfo, p_uris: *glib.List, p_launch_context: ?*gio.AppLaunchContext, p_spawn_flags: glib.SpawnFlags, p_user_setup: ?glib.SpawnChildSetupFunc, p_user_setup_data: ?*anyopaque, p_pid_callback: ?gio.DesktopAppLaunchCallback, p_pid_callback_data: ?*anyopaque, p_stdin_fd: c_int, p_stdout_fd: c_int, p_stderr_fd: c_int, p_error: ?*?*glib.Error) c_int;
-    pub const launchUrisAsManagerWithFds = g_desktop_app_info_launch_uris_as_manager_with_fds;
-
-    /// Returns the list of
-    /// [‘additional application actions’](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html)
-    /// supported on the desktop file, as per the desktop file specification.
-    ///
-    /// As per the specification, this is the list of actions that are
-    /// explicitly listed in the `Actions` key of the `Desktop Entry` group.
-    extern fn g_desktop_app_info_list_actions(p_info: *DesktopAppInfo) [*]const [*:0]const u8;
-    pub const listActions = g_desktop_app_info_list_actions;
-
-    extern fn g_desktop_app_info_get_type() usize;
-    pub const getGObjectType = g_desktop_app_info_get_type;
-
-    extern fn g_object_ref(p_self: *gio.DesktopAppInfo) void;
-    pub const ref = g_object_ref;
-
-    extern fn g_object_unref(p_self: *gio.DesktopAppInfo) void;
-    pub const unref = g_object_unref;
-
-    pub fn as(p_instance: *DesktopAppInfo, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
 /// `GEmblem` is an implementation of `gio.Icon` that supports
 /// having an emblem, which is an icon with additional properties.
 /// It can than be added to a `gio.EmblemedIcon`.
@@ -8722,7 +8473,7 @@ pub const FileMonitor = extern struct {
     /// Implementations are responsible to call this method from the
     /// thread-default main context (see `glib.MainContext.pushThreadDefault`)
     /// of the thread that the monitor was created in.
-    extern fn g_file_monitor_emit_event(p_monitor: *FileMonitor, p_child: *gio.File, p_other_file: *gio.File, p_event_type: gio.FileMonitorEvent) void;
+    extern fn g_file_monitor_emit_event(p_monitor: *FileMonitor, p_child: *gio.File, p_other_file: ?*gio.File, p_event_type: gio.FileMonitorEvent) void;
     pub const emitEvent = g_file_monitor_emit_event;
 
     /// Returns whether the monitor is canceled.
@@ -8999,7 +8750,10 @@ pub const FilenameCompleter = opaque {
     extern fn g_filename_completer_new() *gio.FilenameCompleter;
     pub const new = g_filename_completer_new;
 
-    /// Obtains a completion for `initial_text` from `completer`.
+    /// Obtains a suffix completion for `initial_text` from `completer`.
+    ///
+    /// Suffix will be an empty string if there's no shared suffix among matching
+    /// completions. If there's no matching completions anyway, `NULL` is returned.
     extern fn g_filename_completer_get_completion_suffix(p_completer: *FilenameCompleter, p_initial_text: [*:0]const u8) ?[*:0]u8;
     pub const getCompletionSuffix = g_filename_completer_get_completion_suffix;
 
@@ -9009,6 +8763,9 @@ pub const FilenameCompleter = opaque {
 
     /// If `dirs_only` is `TRUE`, `completer` will only
     /// complete directory names, and not file names.
+    ///
+    /// This function needs to be called before waiting for results from the
+    /// completer to be populated.
     extern fn g_filename_completer_set_dirs_only(p_completer: *FilenameCompleter, p_dirs_only: c_int) void;
     pub const setDirsOnly = g_filename_completer_set_dirs_only;
 
@@ -9170,75 +8927,10 @@ pub const IOModule = opaque {
 
     pub const signals = struct {};
 
-    /// Optional API for GIO modules to implement.
-    ///
-    /// Should return a list of all the extension points that may be
-    /// implemented in this module.
-    ///
-    /// This method will not be called in normal use, however it may be
-    /// called when probing existing modules and recording which extension
-    /// points that this model is used for. This means we won't have to
-    /// load and initialize this module unless its needed.
-    ///
-    /// If this function is not implemented by the module the module will
-    /// always be loaded, initialized and then unloaded on application
-    /// startup so that it can register its extension points during init.
-    ///
-    /// Note that a module need not actually implement all the extension
-    /// points that `gio.IOModule.query` returns, since the exact list of
-    /// extension may depend on runtime issues. However all extension
-    /// points actually implemented must be returned by `gio.IOModule.query`
-    /// (if defined).
-    ///
-    /// When installing a module that implements `gio.IOModule.query` you must
-    /// run gio-querymodules in order to build the cache files required for
-    /// lazy loading.
-    ///
-    /// Since 2.56, this function should be named `g_io_<modulename>_query`, where
-    /// `modulename` is the plugin’s filename with the `lib` or `libgio` prefix and
-    /// everything after the first dot removed, and with `-` replaced with `_`
-    /// throughout. For example, `libgiognutls-helper.so` becomes `gnutls_helper`.
-    /// Using the new symbol names avoids name clashes when building modules
-    /// statically. The old symbol names continue to be supported, but cannot be used
-    /// for static builds.
-    extern fn g_io_module_query() [*:null]?[*:0]u8;
-    pub const query = g_io_module_query;
-
     /// Creates a new GIOModule that will load the specific
     /// shared library when in use.
     extern fn g_io_module_new(p_filename: [*:0]const u8) *gio.IOModule;
     pub const new = g_io_module_new;
-
-    /// Required API for GIO modules to implement.
-    ///
-    /// This function is run after the module has been loaded into GIO,
-    /// to initialize the module. Typically, this function will call
-    /// `gio.ioExtensionPointImplement`.
-    ///
-    /// Since 2.56, this function should be named `g_io_<modulename>_load`, where
-    /// `modulename` is the plugin’s filename with the `lib` or `libgio` prefix and
-    /// everything after the first dot removed, and with `-` replaced with `_`
-    /// throughout. For example, `libgiognutls-helper.so` becomes `gnutls_helper`.
-    /// Using the new symbol names avoids name clashes when building modules
-    /// statically. The old symbol names continue to be supported, but cannot be used
-    /// for static builds.
-    extern fn g_io_module_load(p_module: *IOModule) void;
-    pub const load = g_io_module_load;
-
-    /// Required API for GIO modules to implement.
-    ///
-    /// This function is run when the module is being unloaded from GIO,
-    /// to finalize the module.
-    ///
-    /// Since 2.56, this function should be named `g_io_<modulename>_unload`, where
-    /// `modulename` is the plugin’s filename with the `lib` or `libgio` prefix and
-    /// everything after the first dot removed, and with `-` replaced with `_`
-    /// throughout. For example, `libgiognutls-helper.so` becomes `gnutls_helper`.
-    /// Using the new symbol names avoids name clashes when building modules
-    /// statically. The old symbol names continue to be supported, but cannot be used
-    /// for static builds.
-    extern fn g_io_module_unload(p_module: *IOModule) void;
-    pub const unload = g_io_module_unload;
 
     extern fn g_io_module_get_type() usize;
     pub const getGObjectType = g_io_module_get_type;
@@ -9576,6 +9268,14 @@ pub const InetAddress = extern struct {
             pub const Type = gio.SocketFamily;
         };
 
+        /// The flowinfo for an IPv6 address.
+        /// See `gio.InetAddress.getFlowinfo`.
+        pub const flowinfo = struct {
+            pub const name = "flowinfo";
+
+            pub const Type = c_uint;
+        };
+
         /// Whether this is the "any" address for its family.
         /// See `gio.InetAddress.getIsAny`.
         pub const is_any = struct {
@@ -9655,6 +9355,14 @@ pub const InetAddress = extern struct {
 
             pub const Type = c_int;
         };
+
+        /// The scope-id for an IPv6 address.
+        /// See `gio.InetAddress.getScopeId`.
+        pub const scope_id = struct {
+            pub const name = "scope-id";
+
+            pub const Type = c_uint;
+        };
     };
 
     pub const signals = struct {};
@@ -9670,7 +9378,19 @@ pub const InetAddress = extern struct {
     extern fn g_inet_address_new_from_bytes(p_bytes: [*]const u8, p_family: gio.SocketFamily) *gio.InetAddress;
     pub const newFromBytes = g_inet_address_new_from_bytes;
 
+    /// Creates a new `gio.InetAddress` from the given `family`, `bytes`
+    /// and `scope_id`.
+    ///
+    /// `bytes` must be 4 bytes for `gio.@"SocketFamily.IPV4"` and 16 bytes for
+    /// `gio.@"SocketFamily.IPV6"`.
+    extern fn g_inet_address_new_from_bytes_with_ipv6_info(p_bytes: [*]const u8, p_family: gio.SocketFamily, p_flowinfo: u32, p_scope_id: u32) *gio.InetAddress;
+    pub const newFromBytesWithIpv6Info = g_inet_address_new_from_bytes_with_ipv6_info;
+
     /// Parses `string` as an IP address and creates a new `gio.InetAddress`.
+    ///
+    /// If `address` is an IPv6 address, it can also contain a scope ID
+    /// (separated from the address by a `%`). Note that currently this
+    /// behavior is platform specific. This may change in a future release.
     extern fn g_inet_address_new_from_string(p_string: [*:0]const u8) ?*gio.InetAddress;
     pub const newFromString = g_inet_address_new_from_string;
 
@@ -9685,6 +9405,10 @@ pub const InetAddress = extern struct {
     /// Gets `address`'s family
     extern fn g_inet_address_get_family(p_address: *InetAddress) gio.SocketFamily;
     pub const getFamily = g_inet_address_get_family;
+
+    /// Gets the value of `gio.InetAddress.properties.flowinfo`.
+    extern fn g_inet_address_get_flowinfo(p_address: *InetAddress) u32;
+    pub const getFlowinfo = g_inet_address_get_flowinfo;
 
     /// Tests whether `address` is the "any" address for its family.
     extern fn g_inet_address_get_is_any(p_address: *InetAddress) c_int;
@@ -9735,6 +9459,10 @@ pub const InetAddress = extern struct {
     /// is the size of the data that you get from `gio.InetAddress.toBytes`.
     extern fn g_inet_address_get_native_size(p_address: *InetAddress) usize;
     pub const getNativeSize = g_inet_address_get_native_size;
+
+    /// Gets the value of `gio.InetAddress.properties.scope_id`.
+    extern fn g_inet_address_get_scope_id(p_address: *InetAddress) u32;
+    pub const getScopeId = g_inet_address_get_scope_id;
 
     /// Gets the raw binary address data from `address`.
     extern fn g_inet_address_to_bytes(p_address: *InetAddress) *const u8;
@@ -9879,6 +9607,8 @@ pub const InetSocketAddress = extern struct {
         };
 
         /// The `sin6_flowinfo` field, for IPv6 addresses.
+        ///
+        /// If unset this property is inherited from `gio.InetSocketAddress.properties.address`.
         pub const flowinfo = struct {
             pub const name = "flowinfo";
 
@@ -9893,6 +9623,8 @@ pub const InetSocketAddress = extern struct {
         };
 
         /// The `sin6_scope_id` field, for IPv6 addresses.
+        ///
+        /// If unset this property is inherited from `gio.InetSocketAddress.properties.address`.
         pub const scope_id = struct {
             pub const name = "scope-id";
 
@@ -9909,7 +9641,8 @@ pub const InetSocketAddress = extern struct {
     /// Creates a new `gio.InetSocketAddress` for `address` and `port`.
     ///
     /// If `address` is an IPv6 address, it can also contain a scope ID
-    /// (separated from the address by a `%`).
+    /// (separated from the address by a `%`). Note that currently this
+    /// behavior is platform specific. This may change in a future release.
     extern fn g_inet_socket_address_new_from_string(p_address: [*:0]const u8, p_port: c_uint) ?*gio.InetSocketAddress;
     pub const newFromString = g_inet_socket_address_new_from_string;
 
@@ -9919,6 +9652,8 @@ pub const InetSocketAddress = extern struct {
 
     /// Gets the `sin6_flowinfo` field from `address`,
     /// which must be an IPv6 address.
+    ///
+    /// If not overridden this value will be inherited from `gio.InetSocketAddress.properties.address`.
     extern fn g_inet_socket_address_get_flowinfo(p_address: *InetSocketAddress) u32;
     pub const getFlowinfo = g_inet_socket_address_get_flowinfo;
 
@@ -9928,6 +9663,8 @@ pub const InetSocketAddress = extern struct {
 
     /// Gets the `sin6_scope_id` field from `address`,
     /// which must be an IPv6 address.
+    ///
+    /// If not overridden this value will be inherited from `gio.InetSocketAddress.properties.address`.
     extern fn g_inet_socket_address_get_scope_id(p_address: *InetSocketAddress) u32;
     pub const getScopeId = g_inet_socket_address_get_scope_id;
 
@@ -16100,7 +15837,7 @@ pub const SettingsBackend = extern struct {
     /// end with '/' and must not contain '//').
     ///
     /// The meaning of this signal is that any of the key names resulting
-    /// from the contatenation of `path` with each item in `items` may have
+    /// from the concatenation of `path` with each item in `items` may have
     /// changed.
     ///
     /// The same rules for when notifications must occur apply as per
@@ -16786,7 +16523,7 @@ pub const SimpleAsyncResult = opaque {
 /// This is useful when you obtained a `gio.InputStream` and a
 /// `gio.OutputStream` by other means, for instance creating them with
 /// platform specific methods as
-/// [``gio.UnixInputStream.new``](../gio-unix/ctor.UnixInputStream.new.html)
+/// [``g_unix_input_stream_new``](../gio-unix/ctor.UnixInputStream.new.html)
 /// (from `gio-unix-2.0.pc` / `GioUnix-2.0`), and you want to
 /// take advantage of the methods provided by `gio.IOStream`.
 pub const SimpleIOStream = opaque {
@@ -19236,6 +18973,14 @@ pub const SocketListener = extern struct {
     /// This is useful if you need to have a socket for incoming connections
     /// but don't care about the specific port number.
     ///
+    /// If possible, the `gio.SocketListener` will listen on both IPv4 and
+    /// IPv6 (listening on the same port on both). If listening on one of the socket
+    /// families fails, the `gio.SocketListener` will only listen on the other.
+    /// If listening on both fails, an error will be returned.
+    ///
+    /// If you need to distinguish whether listening on IPv4 or IPv6 or both was
+    /// successful, connect to `gio.SocketListener.signals.event`.
+    ///
     /// `source_object` will be passed out in the various calls
     /// to accept to identify this particular source, which is
     /// useful if you're listening on multiple addresses and do
@@ -19246,6 +18991,14 @@ pub const SocketListener = extern struct {
     /// Helper function for `gio.SocketListener.addAddress` that
     /// creates a TCP/IP socket listening on IPv4 and IPv6 (if
     /// supported) on the specified port on all interfaces.
+    ///
+    /// If possible, the `gio.SocketListener` will listen on both IPv4 and
+    /// IPv6 (listening on the same port on both). If listening on one of the socket
+    /// families fails, the `gio.SocketListener` will only listen on the other.
+    /// If listening on both fails, an error will be returned.
+    ///
+    /// If you need to distinguish whether listening on IPv4 or IPv6 or both was
+    /// successful, connect to `gio.SocketListener.signals.event`.
     ///
     /// `source_object` will be passed out in the various calls
     /// to accept to identify this particular source, which is
@@ -19261,6 +19014,9 @@ pub const SocketListener = extern struct {
     /// Adds `socket` to the set of sockets that we try to accept
     /// new clients from. The socket must be bound to a local
     /// address and listened to.
+    ///
+    /// For parallel calls to `gio.SocketListener` methods to work, the socket
+    /// must be in non-blocking mode. (See `gio.Socket.properties.blocking`.)
     ///
     /// `source_object` will be passed out in the various calls
     /// to accept to identify this particular source, which is
@@ -23891,352 +23647,6 @@ pub const UnixFDList = extern struct {
     }
 };
 
-/// This `gio.SocketControlMessage` contains a `gio.UnixFDList`.
-/// It may be sent using `gio.Socket.sendMessage` and received using
-/// `gio.Socket.receiveMessage` over UNIX sockets (ie: sockets in the
-/// `G_SOCKET_FAMILY_UNIX` family). The file descriptors are copied
-/// between processes by the kernel.
-///
-/// For an easier way to send and receive file descriptors over
-/// stream-oriented UNIX sockets, see `gio.UnixConnection.sendFd` and
-/// `gio.UnixConnection.receiveFd`.
-///
-/// Note that `<gio/gunixfdmessage.h>` belongs to the UNIX-specific GIO
-/// interfaces, thus you have to use the `gio-unix-2.0.pc` pkg-config
-/// file or the `GioUnix-2.0` GIR namespace when using it.
-pub const UnixFDMessage = extern struct {
-    pub const Parent = gio.SocketControlMessage;
-    pub const Implements = [_]type{};
-    pub const Class = gio.UnixFDMessageClass;
-    f_parent_instance: gio.SocketControlMessage,
-    f_priv: ?*gio.UnixFDMessagePrivate,
-
-    pub const virtual_methods = struct {};
-
-    pub const properties = struct {
-        /// The `gio.UnixFDList` object to send with the message.
-        pub const fd_list = struct {
-            pub const name = "fd-list";
-
-            pub const Type = ?*gio.UnixFDList;
-        };
-    };
-
-    pub const signals = struct {};
-
-    /// Creates a new `gio.UnixFDMessage` containing an empty file descriptor
-    /// list.
-    extern fn g_unix_fd_message_new() *gio.UnixFDMessage;
-    pub const new = g_unix_fd_message_new;
-
-    /// Creates a new `gio.UnixFDMessage` containing `list`.
-    extern fn g_unix_fd_message_new_with_fd_list(p_fd_list: *gio.UnixFDList) *gio.UnixFDMessage;
-    pub const newWithFdList = g_unix_fd_message_new_with_fd_list;
-
-    /// Adds a file descriptor to `message`.
-    ///
-    /// The file descriptor is duplicated using `dup`. You keep your copy
-    /// of the descriptor and the copy contained in `message` will be closed
-    /// when `message` is finalized.
-    ///
-    /// A possible cause of failure is exceeding the per-process or
-    /// system-wide file descriptor limit.
-    extern fn g_unix_fd_message_append_fd(p_message: *UnixFDMessage, p_fd: c_int, p_error: ?*?*glib.Error) c_int;
-    pub const appendFd = g_unix_fd_message_append_fd;
-
-    /// Gets the `gio.UnixFDList` contained in `message`.  This function does not
-    /// return a reference to the caller, but the returned list is valid for
-    /// the lifetime of `message`.
-    extern fn g_unix_fd_message_get_fd_list(p_message: *UnixFDMessage) *gio.UnixFDList;
-    pub const getFdList = g_unix_fd_message_get_fd_list;
-
-    /// Returns the array of file descriptors that is contained in this
-    /// object.
-    ///
-    /// After this call, the descriptors are no longer contained in
-    /// `message`. Further calls will return an empty list (unless more
-    /// descriptors have been added).
-    ///
-    /// The return result of this function must be freed with `glib.free`.
-    /// The caller is also responsible for closing all of the file
-    /// descriptors.
-    ///
-    /// If `length` is non-`NULL` then it is set to the number of file
-    /// descriptors in the returned array. The returned array is also
-    /// terminated with -1.
-    ///
-    /// This function never returns `NULL`. In case there are no file
-    /// descriptors contained in `message`, an empty array is returned.
-    extern fn g_unix_fd_message_steal_fds(p_message: *UnixFDMessage, p_length: ?*c_int) [*]c_int;
-    pub const stealFds = g_unix_fd_message_steal_fds;
-
-    extern fn g_unix_fd_message_get_type() usize;
-    pub const getGObjectType = g_unix_fd_message_get_type;
-
-    extern fn g_object_ref(p_self: *gio.UnixFDMessage) void;
-    pub const ref = g_object_ref;
-
-    extern fn g_object_unref(p_self: *gio.UnixFDMessage) void;
-    pub const unref = g_object_unref;
-
-    pub fn as(p_instance: *UnixFDMessage, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// `GUnixInputStream` implements `gio.InputStream` for reading from a UNIX
-/// file descriptor, including asynchronous operations. (If the file
-/// descriptor refers to a socket or pipe, this will use ``poll`` to do
-/// asynchronous I/O. If it refers to a regular file, it will fall back
-/// to doing asynchronous I/O in another thread.)
-///
-/// Note that `<gio/gunixinputstream.h>` belongs to the UNIX-specific GIO
-/// interfaces, thus you have to use the `gio-unix-2.0.pc` pkg-config
-/// file or the `GioUnix-2.0` GIR namespace when using it.
-pub const UnixInputStream = extern struct {
-    pub const Parent = gio.InputStream;
-    pub const Implements = [_]type{ gio.FileDescriptorBased, gio.PollableInputStream };
-    pub const Class = gio.UnixInputStreamClass;
-    f_parent_instance: gio.InputStream,
-    f_priv: ?*gio.UnixInputStreamPrivate,
-
-    pub const virtual_methods = struct {};
-
-    pub const properties = struct {
-        /// Whether to close the file descriptor when the stream is closed.
-        pub const close_fd = struct {
-            pub const name = "close-fd";
-
-            pub const Type = c_int;
-        };
-
-        /// The file descriptor that the stream reads from.
-        pub const fd = struct {
-            pub const name = "fd";
-
-            pub const Type = c_int;
-        };
-    };
-
-    pub const signals = struct {};
-
-    /// Creates a new `gio.UnixInputStream` for the given `fd`.
-    ///
-    /// If `close_fd` is `TRUE`, the file descriptor will be closed
-    /// when the stream is closed.
-    extern fn g_unix_input_stream_new(p_fd: c_int, p_close_fd: c_int) *gio.UnixInputStream;
-    pub const new = g_unix_input_stream_new;
-
-    /// Returns whether the file descriptor of `stream` will be
-    /// closed when the stream is closed.
-    extern fn g_unix_input_stream_get_close_fd(p_stream: *UnixInputStream) c_int;
-    pub const getCloseFd = g_unix_input_stream_get_close_fd;
-
-    /// Return the UNIX file descriptor that the stream reads from.
-    extern fn g_unix_input_stream_get_fd(p_stream: *UnixInputStream) c_int;
-    pub const getFd = g_unix_input_stream_get_fd;
-
-    /// Sets whether the file descriptor of `stream` shall be closed
-    /// when the stream is closed.
-    extern fn g_unix_input_stream_set_close_fd(p_stream: *UnixInputStream, p_close_fd: c_int) void;
-    pub const setCloseFd = g_unix_input_stream_set_close_fd;
-
-    extern fn g_unix_input_stream_get_type() usize;
-    pub const getGObjectType = g_unix_input_stream_get_type;
-
-    extern fn g_object_ref(p_self: *gio.UnixInputStream) void;
-    pub const ref = g_object_ref;
-
-    extern fn g_object_unref(p_self: *gio.UnixInputStream) void;
-    pub const unref = g_object_unref;
-
-    pub fn as(p_instance: *UnixInputStream, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// Watches for changes to the set of mount entries and mount points in the
-/// system.
-///
-/// Connect to the `giounix.MountMonitor.signals.mounts_changed` signal to be
-/// notified of changes to the `giounix.MountEntry` list.
-///
-/// Connect to the `giounix.MountMonitor.signals.mountpoints_changed` signal to
-/// be notified of changes to the `giounix.MountPoint` list.
-pub const UnixMountMonitor = opaque {
-    pub const Parent = gobject.Object;
-    pub const Implements = [_]type{};
-    pub const Class = gio.UnixMountMonitorClass;
-    pub const virtual_methods = struct {};
-
-    pub const properties = struct {};
-
-    pub const signals = struct {
-        /// Emitted when the Unix mount points have changed.
-        pub const mountpoints_changed = struct {
-            pub const name = "mountpoints-changed";
-
-            pub fn connect(p_instance: anytype, comptime P_Data: type, p_callback: *const fn (@TypeOf(p_instance), P_Data) callconv(.c) void, p_data: P_Data, p_options: gobject.ext.ConnectSignalOptions(P_Data)) c_ulong {
-                return gobject.signalConnectClosureById(
-                    @ptrCast(@alignCast(gobject.ext.as(UnixMountMonitor, p_instance))),
-                    gobject.signalLookup("mountpoints-changed", UnixMountMonitor.getGObjectType()),
-                    glib.quarkFromString(p_options.detail orelse null),
-                    gobject.CClosure.new(@ptrCast(p_callback), p_data, @ptrCast(p_options.destroyData)),
-                    @intFromBool(p_options.after),
-                );
-            }
-        };
-
-        /// Emitted when the Unix mount entries have changed.
-        pub const mounts_changed = struct {
-            pub const name = "mounts-changed";
-
-            pub fn connect(p_instance: anytype, comptime P_Data: type, p_callback: *const fn (@TypeOf(p_instance), P_Data) callconv(.c) void, p_data: P_Data, p_options: gobject.ext.ConnectSignalOptions(P_Data)) c_ulong {
-                return gobject.signalConnectClosureById(
-                    @ptrCast(@alignCast(gobject.ext.as(UnixMountMonitor, p_instance))),
-                    gobject.signalLookup("mounts-changed", UnixMountMonitor.getGObjectType()),
-                    glib.quarkFromString(p_options.detail orelse null),
-                    gobject.CClosure.new(@ptrCast(p_callback), p_data, @ptrCast(p_options.destroyData)),
-                    @intFromBool(p_options.after),
-                );
-            }
-        };
-    };
-
-    /// Gets the `giounix.MountMonitor` for the current thread-default main
-    /// context.
-    ///
-    /// The mount monitor can be used to monitor for changes to the list of
-    /// mounted filesystems as well as the list of mount points (ie: fstab
-    /// entries).
-    ///
-    /// You must only call `gobject.Object.unref` on the return value from
-    /// under the same main context as you called this function.
-    extern fn g_unix_mount_monitor_get() *gio.UnixMountMonitor;
-    pub const get = g_unix_mount_monitor_get;
-
-    /// Deprecated alias for `giounix.MountMonitor.get`.
-    ///
-    /// This function was never a true constructor, which is why it was
-    /// renamed.
-    extern fn g_unix_mount_monitor_new() *gio.UnixMountMonitor;
-    pub const new = g_unix_mount_monitor_new;
-
-    /// This function does nothing.
-    ///
-    /// Before 2.44, this was a partially-effective way of controlling the
-    /// rate at which events would be reported under some uncommon
-    /// circumstances.  Since `mount_monitor` is a singleton, it also meant
-    /// that calling this function would have side effects for other users of
-    /// the monitor.
-    extern fn g_unix_mount_monitor_set_rate_limit(p_mount_monitor: *UnixMountMonitor, p_limit_msec: c_int) void;
-    pub const setRateLimit = g_unix_mount_monitor_set_rate_limit;
-
-    extern fn g_unix_mount_monitor_get_type() usize;
-    pub const getGObjectType = g_unix_mount_monitor_get_type;
-
-    extern fn g_object_ref(p_self: *gio.UnixMountMonitor) void;
-    pub const ref = g_object_ref;
-
-    extern fn g_object_unref(p_self: *gio.UnixMountMonitor) void;
-    pub const unref = g_object_unref;
-
-    pub fn as(p_instance: *UnixMountMonitor, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// `GUnixOutputStream` implements `gio.OutputStream` for writing to a UNIX
-/// file descriptor, including asynchronous operations. (If the file
-/// descriptor refers to a socket or pipe, this will use ``poll`` to do
-/// asynchronous I/O. If it refers to a regular file, it will fall back
-/// to doing asynchronous I/O in another thread.)
-///
-/// Note that `<gio/gunixoutputstream.h>` belongs to the UNIX-specific GIO
-/// interfaces, thus you have to use the `gio-unix-2.0.pc` pkg-config file
-/// file or the `GioUnix-2.0` GIR namespace when using it.
-pub const UnixOutputStream = extern struct {
-    pub const Parent = gio.OutputStream;
-    pub const Implements = [_]type{ gio.FileDescriptorBased, gio.PollableOutputStream };
-    pub const Class = gio.UnixOutputStreamClass;
-    f_parent_instance: gio.OutputStream,
-    f_priv: ?*gio.UnixOutputStreamPrivate,
-
-    pub const virtual_methods = struct {};
-
-    pub const properties = struct {
-        /// Whether to close the file descriptor when the stream is closed.
-        pub const close_fd = struct {
-            pub const name = "close-fd";
-
-            pub const Type = c_int;
-        };
-
-        /// The file descriptor that the stream writes to.
-        pub const fd = struct {
-            pub const name = "fd";
-
-            pub const Type = c_int;
-        };
-    };
-
-    pub const signals = struct {};
-
-    /// Creates a new `gio.UnixOutputStream` for the given `fd`.
-    ///
-    /// If `close_fd`, is `TRUE`, the file descriptor will be closed when
-    /// the output stream is destroyed.
-    extern fn g_unix_output_stream_new(p_fd: c_int, p_close_fd: c_int) *gio.UnixOutputStream;
-    pub const new = g_unix_output_stream_new;
-
-    /// Returns whether the file descriptor of `stream` will be
-    /// closed when the stream is closed.
-    extern fn g_unix_output_stream_get_close_fd(p_stream: *UnixOutputStream) c_int;
-    pub const getCloseFd = g_unix_output_stream_get_close_fd;
-
-    /// Return the UNIX file descriptor that the stream writes to.
-    extern fn g_unix_output_stream_get_fd(p_stream: *UnixOutputStream) c_int;
-    pub const getFd = g_unix_output_stream_get_fd;
-
-    /// Sets whether the file descriptor of `stream` shall be closed
-    /// when the stream is closed.
-    extern fn g_unix_output_stream_set_close_fd(p_stream: *UnixOutputStream, p_close_fd: c_int) void;
-    pub const setCloseFd = g_unix_output_stream_set_close_fd;
-
-    extern fn g_unix_output_stream_get_type() usize;
-    pub const getGObjectType = g_unix_output_stream_get_type;
-
-    extern fn g_object_ref(p_self: *gio.UnixOutputStream) void;
-    pub const ref = g_object_ref;
-
-    extern fn g_object_unref(p_self: *gio.UnixOutputStream) void;
-    pub const unref = g_object_unref;
-
-    pub fn as(p_instance: *UnixOutputStream, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
 /// Support for UNIX-domain (also known as local) sockets, corresponding to
 /// `struct sockaddr_un`.
 ///
@@ -25087,9 +24497,14 @@ pub const ZlibCompressor = opaque {
     pub const virtual_methods = struct {};
 
     pub const properties = struct {
-        /// If set to a non-`NULL` `gio.FileInfo` object, and `gio.ZlibCompressor.properties.format` is
-        /// `G_ZLIB_COMPRESSOR_FORMAT_GZIP`, the compressor will write the file name
-        /// and modification time from the file info to the GZIP header.
+        /// A `gio.FileInfo` containing file information to put into the gzip
+        /// header.
+        ///
+        /// The file name and modification time from the file info will be used.
+        ///
+        /// This will only be used if non-`NULL` and
+        /// `gio.ZlibCompressor.properties.format` is
+        /// `gio.@"ZlibCompressorFormat.GZIP"`.
         pub const file_info = struct {
             pub const name = "file-info";
 
@@ -25104,9 +24519,27 @@ pub const ZlibCompressor = opaque {
         };
 
         /// The level of compression from `0` (no compression) to `9` (most
-        /// compression). `-1` for the default level.
+        /// compression).
+        ///
+        /// `-1` for the default level.
         pub const level = struct {
             pub const name = "level";
+
+            pub const Type = c_int;
+        };
+
+        /// The OS code of the gzip header.
+        ///
+        /// This will be used if set to a non-negative value, and if
+        /// `gio.ZlibCompressor.properties.format` is
+        /// `gio.@"ZlibCompressorFormat.GZIP"`, the compressor will set the OS code of
+        /// the gzip header to this value.
+        ///
+        /// If the value is unset, zlib will set the OS code depending on the platform.
+        /// This may be undesirable when reproducible output is desired. In that case setting
+        /// the OS code to `3` (for Unix) is recommended.
+        pub const os = struct {
+            pub const name = "os";
 
             pub const Type = c_int;
         };
@@ -25114,24 +24547,33 @@ pub const ZlibCompressor = opaque {
 
     pub const signals = struct {};
 
-    /// Creates a new `gio.ZlibCompressor`.
+    /// Creates a compressor.
     extern fn g_zlib_compressor_new(p_format: gio.ZlibCompressorFormat, p_level: c_int) *gio.ZlibCompressor;
     pub const new = g_zlib_compressor_new;
 
-    /// Returns the `gio.ZlibCompressor.properties.file`-info property.
+    /// Gets the `gio.ZlibCompressor.properties.file_info` property.
     extern fn g_zlib_compressor_get_file_info(p_compressor: *ZlibCompressor) ?*gio.FileInfo;
     pub const getFileInfo = g_zlib_compressor_get_file_info;
 
-    /// Sets `file_info` in `compressor`. If non-`NULL`, and `compressor`'s
-    /// `gio.ZlibCompressor.properties.format` property is `G_ZLIB_COMPRESSOR_FORMAT_GZIP`,
-    /// it will be used to set the file name and modification time in
-    /// the GZIP header of the compressed data.
+    /// Gets the `gio.ZlibCompressor.properties.os` property.
+    extern fn g_zlib_compressor_get_os(p_compressor: *ZlibCompressor) c_int;
+    pub const getOs = g_zlib_compressor_get_os;
+
+    /// Sets the `gio.ZlibCompressor.properties.file_info` property.
     ///
     /// Note: it is an error to call this function while a compression is in
     /// progress; it may only be called immediately after creation of `compressor`,
     /// or after resetting it with `gio.Converter.reset`.
     extern fn g_zlib_compressor_set_file_info(p_compressor: *ZlibCompressor, p_file_info: ?*gio.FileInfo) void;
     pub const setFileInfo = g_zlib_compressor_set_file_info;
+
+    /// Sets the `gio.ZlibCompressor.properties.os` property.
+    ///
+    /// Note: it is an error to call this function while a compression is in
+    /// progress; it may only be called immediately after creation of `compressor`,
+    /// or after resetting it with `gio.Converter.reset`.
+    extern fn g_zlib_compressor_set_os(p_compressor: *ZlibCompressor, p_os: c_int) void;
+    pub const setOs = g_zlib_compressor_set_os;
 
     extern fn g_zlib_compressor_get_type() usize;
     pub const getGObjectType = g_zlib_compressor_get_type;
@@ -25161,10 +24603,12 @@ pub const ZlibDecompressor = opaque {
     pub const virtual_methods = struct {};
 
     pub const properties = struct {
-        /// A `gio.FileInfo` containing the information found in the GZIP header
-        /// of the data stream processed, or `NULL` if the header was not yet
-        /// fully processed, is not present at all, or the compressor's
-        /// `gio.ZlibDecompressor.properties.format` property is not `G_ZLIB_COMPRESSOR_FORMAT_GZIP`.
+        /// A `gio.FileInfo` containing the information found in the gzip header
+        /// of the data stream processed.
+        ///
+        /// This will be `NULL` if the header was not yet fully processed, is not
+        /// present at all, or the compressor’s `gio.ZlibDecompressor.properties.format`
+        /// property is not `gio.@"ZlibCompressorFormat.GZIP"`.
         pub const file_info = struct {
             pub const name = "file-info";
 
@@ -25181,15 +24625,11 @@ pub const ZlibDecompressor = opaque {
 
     pub const signals = struct {};
 
-    /// Creates a new `gio.ZlibDecompressor`.
+    /// Creates a new decompressor.
     extern fn g_zlib_decompressor_new(p_format: gio.ZlibCompressorFormat) *gio.ZlibDecompressor;
     pub const new = g_zlib_decompressor_new;
 
-    /// Retrieves the `gio.FileInfo` constructed from the GZIP header data
-    /// of compressed data processed by `compressor`, or `NULL` if `decompressor`'s
-    /// `gio.ZlibDecompressor.properties.format` property is not `G_ZLIB_COMPRESSOR_FORMAT_GZIP`,
-    /// or the header data was not fully processed yet, or it not present in the
-    /// data stream at all.
+    /// Gets the `gio.ZlibDecompressor.properties.file_info` property.
     extern fn g_zlib_decompressor_get_file_info(p_decompressor: *ZlibDecompressor) ?*gio.FileInfo;
     pub const getFileInfo = g_zlib_decompressor_get_file_info;
 
@@ -28733,67 +28173,6 @@ pub const DebugController = opaque {
     }
 };
 
-/// `gio.DesktopAppInfoLookup` is an opaque data structure and can only be accessed
-/// using the following functions.
-pub const DesktopAppInfoLookup = opaque {
-    pub const Prerequisites = [_]type{gobject.Object};
-    pub const Iface = gio.DesktopAppInfoLookupIface;
-    pub const virtual_methods = struct {
-        /// Gets the default application for launching applications
-        /// using this URI scheme for a particular `gio.DesktopAppInfoLookup`
-        /// implementation.
-        ///
-        /// The `gio.DesktopAppInfoLookup` interface and this function is used
-        /// to implement `gio.AppInfo.getDefaultForUriScheme` backends
-        /// in a GIO module. There is no reason for applications to use it
-        /// directly. Applications should use
-        /// `gio.AppInfo.getDefaultForUriScheme`.
-        pub const get_default_for_uri_scheme = struct {
-            pub fn call(p_class: anytype, p_lookup: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_uri_scheme: [*:0]const u8) ?*gio.AppInfo {
-                return gobject.ext.as(DesktopAppInfoLookup.Iface, p_class).f_get_default_for_uri_scheme.?(gobject.ext.as(DesktopAppInfoLookup, p_lookup), p_uri_scheme);
-            }
-
-            pub fn implement(p_class: anytype, p_implementation: *const fn (p_lookup: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_uri_scheme: [*:0]const u8) callconv(.c) ?*gio.AppInfo) void {
-                gobject.ext.as(DesktopAppInfoLookup.Iface, p_class).f_get_default_for_uri_scheme = @ptrCast(p_implementation);
-            }
-        };
-    };
-
-    pub const properties = struct {};
-
-    pub const signals = struct {};
-
-    /// Gets the default application for launching applications
-    /// using this URI scheme for a particular `gio.DesktopAppInfoLookup`
-    /// implementation.
-    ///
-    /// The `gio.DesktopAppInfoLookup` interface and this function is used
-    /// to implement `gio.AppInfo.getDefaultForUriScheme` backends
-    /// in a GIO module. There is no reason for applications to use it
-    /// directly. Applications should use
-    /// `gio.AppInfo.getDefaultForUriScheme`.
-    extern fn g_desktop_app_info_lookup_get_default_for_uri_scheme(p_lookup: *DesktopAppInfoLookup, p_uri_scheme: [*:0]const u8) ?*gio.AppInfo;
-    pub const getDefaultForUriScheme = g_desktop_app_info_lookup_get_default_for_uri_scheme;
-
-    extern fn g_desktop_app_info_lookup_get_type() usize;
-    pub const getGObjectType = g_desktop_app_info_lookup_get_type;
-
-    extern fn g_object_ref(p_self: *gio.DesktopAppInfoLookup) void;
-    pub const ref = g_object_ref;
-
-    extern fn g_object_unref(p_self: *gio.DesktopAppInfoLookup) void;
-    pub const unref = g_object_unref;
-
-    pub fn as(p_instance: *DesktopAppInfoLookup, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
 /// `GDrive` represents a piece of hardware connected to the machine.
 /// It’s generally only created for removable hardware or hardware with
 /// removable media. For example, an optical disc drive, or a USB flash drive.
@@ -31649,35 +31028,48 @@ pub const File = opaque {
         };
 
         /// Gets the requested information about specified `file`.
+        ///
         /// The result is a `gio.FileInfo` object that contains key-value
         /// attributes (such as the type or size of the file).
         ///
         /// The `attributes` value is a string that specifies the file
         /// attributes that should be gathered. It is not an error if
-        /// it's not possible to read a particular requested attribute
-        /// from a file - it just won't be set. `attributes` should be a
-        /// comma-separated list of attributes or attribute wildcards.
-        /// The wildcard "*" means all attributes, and a wildcard like
-        /// "standard::*" means all attributes in the standard namespace.
-        /// An example attribute query be "standard::*,owner::user".
+        /// it’s not possible to read a particular requested attribute
+        /// from a file — it just won't be set. In particular this means that if a file
+        /// is inaccessible (due to being in a folder with restrictive permissions), for
+        /// example, you can expect the returned `gio.FileInfo` to have very few
+        /// attributes set. You should check whether an attribute is set using
+        /// `gio.FileInfo.hasAttribute` before trying to retrieve its value.
+        ///
+        /// It is guaranteed that if any of the following attributes are listed in
+        /// `attributes`, they will always be set in the returned `gio.FileInfo`,
+        /// even if the user doesn’t have permissions to access the file:
+        ///
+        ///  - `gio.FILE_ATTRIBUTE_STANDARD_NAME`
+        ///  - `gio.FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME`
+        ///
+        /// `attributes` should be a comma-separated list of attributes or attribute
+        /// wildcards. The wildcard `"*"` means all attributes, and a wildcard like
+        /// `"standard::*"` means all attributes in the standard namespace.
+        /// An example attribute query might be `"standard::*,owner::user"`.
         /// The standard attributes are available as defines, like
-        /// `G_FILE_ATTRIBUTE_STANDARD_NAME`.
+        /// `gio.FILE_ATTRIBUTE_STANDARD_NAME`.
         ///
         /// If `cancellable` is not `NULL`, then the operation can be cancelled
         /// by triggering the cancellable object from another thread. If the
-        /// operation was cancelled, the error `G_IO_ERROR_CANCELLED` will be
+        /// operation was cancelled, the error `gio.@"IOErrorEnum.CANCELLED"` will be
         /// returned.
         ///
         /// For symlinks, normally the information about the target of the
         /// symlink is returned, rather than information about the symlink
-        /// itself. However if you pass `G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS`
+        /// itself. However if you pass `gio.@"FileQueryInfoFlags.NOFOLLOW_SYMLINKS"`
         /// in `flags` the information about the symlink itself will be returned.
         /// Also, for symlinks that point to non-existing files the information
         /// about the symlink itself will be returned.
         ///
-        /// If the file does not exist, the `G_IO_ERROR_NOT_FOUND` error will be
+        /// If the file does not exist, the `gio.@"IOErrorEnum.NOT_FOUND"` error will be
         /// returned. Other errors are possible too, and depend on what kind of
-        /// filesystem the file is on.
+        /// file system the file is on.
         pub const query_info = struct {
             pub fn call(p_class: anytype, p_file: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_attributes: [*:0]const u8, p_flags: gio.FileQueryInfoFlags, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) ?*gio.FileInfo {
                 return gobject.ext.as(File.Iface, p_class).f_query_info.?(gobject.ext.as(File, p_file), p_attributes, p_flags, p_cancellable, p_error);
@@ -32152,7 +31544,7 @@ pub const File = opaque {
         /// Sends `file` to the "Trashcan", if possible. This is similar to
         /// deleting it, but the user can recover it before emptying the trashcan.
         /// Trashing is disabled for system mounts by default (see
-        /// `gio.UnixMountEntry.isSystemInternal`), so this call can return the
+        /// `g_unix_mount_entry_is_system_internal`), so this call can return the
         /// `G_IO_ERROR_NOT_SUPPORTED` error. Since GLib 2.66, the `x-gvfs-notrash` unix
         /// mount option can be used to disable `gio.File.trash` support for particular
         /// mounts, the `G_IO_ERROR_NOT_SUPPORTED` error will be returned in that case.
@@ -33386,35 +32778,48 @@ pub const File = opaque {
     pub const queryFilesystemInfoFinish = g_file_query_filesystem_info_finish;
 
     /// Gets the requested information about specified `file`.
+    ///
     /// The result is a `gio.FileInfo` object that contains key-value
     /// attributes (such as the type or size of the file).
     ///
     /// The `attributes` value is a string that specifies the file
     /// attributes that should be gathered. It is not an error if
-    /// it's not possible to read a particular requested attribute
-    /// from a file - it just won't be set. `attributes` should be a
-    /// comma-separated list of attributes or attribute wildcards.
-    /// The wildcard "*" means all attributes, and a wildcard like
-    /// "standard::*" means all attributes in the standard namespace.
-    /// An example attribute query be "standard::*,owner::user".
+    /// it’s not possible to read a particular requested attribute
+    /// from a file — it just won't be set. In particular this means that if a file
+    /// is inaccessible (due to being in a folder with restrictive permissions), for
+    /// example, you can expect the returned `gio.FileInfo` to have very few
+    /// attributes set. You should check whether an attribute is set using
+    /// `gio.FileInfo.hasAttribute` before trying to retrieve its value.
+    ///
+    /// It is guaranteed that if any of the following attributes are listed in
+    /// `attributes`, they will always be set in the returned `gio.FileInfo`,
+    /// even if the user doesn’t have permissions to access the file:
+    ///
+    ///  - `gio.FILE_ATTRIBUTE_STANDARD_NAME`
+    ///  - `gio.FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME`
+    ///
+    /// `attributes` should be a comma-separated list of attributes or attribute
+    /// wildcards. The wildcard `"*"` means all attributes, and a wildcard like
+    /// `"standard::*"` means all attributes in the standard namespace.
+    /// An example attribute query might be `"standard::*,owner::user"`.
     /// The standard attributes are available as defines, like
-    /// `G_FILE_ATTRIBUTE_STANDARD_NAME`.
+    /// `gio.FILE_ATTRIBUTE_STANDARD_NAME`.
     ///
     /// If `cancellable` is not `NULL`, then the operation can be cancelled
     /// by triggering the cancellable object from another thread. If the
-    /// operation was cancelled, the error `G_IO_ERROR_CANCELLED` will be
+    /// operation was cancelled, the error `gio.@"IOErrorEnum.CANCELLED"` will be
     /// returned.
     ///
     /// For symlinks, normally the information about the target of the
     /// symlink is returned, rather than information about the symlink
-    /// itself. However if you pass `G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS`
+    /// itself. However if you pass `gio.@"FileQueryInfoFlags.NOFOLLOW_SYMLINKS"`
     /// in `flags` the information about the symlink itself will be returned.
     /// Also, for symlinks that point to non-existing files the information
     /// about the symlink itself will be returned.
     ///
-    /// If the file does not exist, the `G_IO_ERROR_NOT_FOUND` error will be
+    /// If the file does not exist, the `gio.@"IOErrorEnum.NOT_FOUND"` error will be
     /// returned. Other errors are possible too, and depend on what kind of
-    /// filesystem the file is on.
+    /// file system the file is on.
     extern fn g_file_query_info(p_file: *File, p_attributes: [*:0]const u8, p_flags: gio.FileQueryInfoFlags, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) ?*gio.FileInfo;
     pub const queryInfo = g_file_query_info;
 
@@ -33827,7 +33232,7 @@ pub const File = opaque {
     /// Sends `file` to the "Trashcan", if possible. This is similar to
     /// deleting it, but the user can recover it before emptying the trashcan.
     /// Trashing is disabled for system mounts by default (see
-    /// `gio.UnixMountEntry.isSystemInternal`), so this call can return the
+    /// `g_unix_mount_entry_is_system_internal`), so this call can return the
     /// `G_IO_ERROR_NOT_SUPPORTED` error. Since GLib 2.66, the `x-gvfs-notrash` unix
     /// mount option can be used to disable `gio.File.trash` support for particular
     /// mounts, the `G_IO_ERROR_NOT_SUPPORTED` error will be returned in that case.
@@ -33898,57 +33303,6 @@ pub const File = opaque {
     pub const unref = g_object_unref;
 
     pub fn as(p_instance: *File, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// `GFileDescriptorBased` is an interface for file descriptor based IO.
-///
-/// It is implemented by streams (implementations of `gio.InputStream` or
-/// `gio.OutputStream`) that are based on file descriptors.
-///
-/// Note that `<gio/gfiledescriptorbased.h>` belongs to the UNIX-specific
-/// GIO interfaces, thus you have to use the `gio-unix-2.0.pc` pkg-config
-/// file or the `GioUnix-2.0` GIR namespace when using it.
-pub const FileDescriptorBased = opaque {
-    pub const Prerequisites = [_]type{gobject.Object};
-    pub const Iface = gio.FileDescriptorBasedIface;
-    pub const virtual_methods = struct {
-        /// Gets the underlying file descriptor.
-        pub const get_fd = struct {
-            pub fn call(p_class: anytype, p_fd_based: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) c_int {
-                return gobject.ext.as(FileDescriptorBased.Iface, p_class).f_get_fd.?(gobject.ext.as(FileDescriptorBased, p_fd_based));
-            }
-
-            pub fn implement(p_class: anytype, p_implementation: *const fn (p_fd_based: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) callconv(.c) c_int) void {
-                gobject.ext.as(FileDescriptorBased.Iface, p_class).f_get_fd = @ptrCast(p_implementation);
-            }
-        };
-    };
-
-    pub const properties = struct {};
-
-    pub const signals = struct {};
-
-    /// Gets the underlying file descriptor.
-    extern fn g_file_descriptor_based_get_fd(p_fd_based: *FileDescriptorBased) c_int;
-    pub const getFd = g_file_descriptor_based_get_fd;
-
-    extern fn g_file_descriptor_based_get_type() usize;
-    pub const getGObjectType = g_file_descriptor_based_get_type;
-
-    extern fn g_object_ref(p_self: *gio.FileDescriptorBased) void;
-    pub const ref = g_object_ref;
-
-    extern fn g_object_unref(p_self: *gio.FileDescriptorBased) void;
-    pub const unref = g_object_unref;
-
-    pub fn as(p_instance: *FileDescriptorBased, comptime P_T: type) *P_T {
         return gobject.ext.as(P_T, p_instance);
     }
 
@@ -34652,10 +34006,16 @@ pub const MemoryMonitor = opaque {
     pub const properties = struct {};
 
     pub const signals = struct {
-        /// Emitted when the system is running low on free memory. The signal
+        /// Emitted when the system is running low on free memory.
+        ///
+        /// The signal
         /// handler should then take the appropriate action depending on the
         /// warning level. See the `gio.MemoryMonitorWarningLevel` documentation for
         /// details.
+        ///
+        /// Since the `gio.MemoryMonitor` is a singleton, this signal will be
+        /// emitted in the `glib.MainContext.default`[global-default main
+        /// context].
         pub const low_memory_warning = struct {
             pub const name = "low-memory-warning";
 
@@ -37721,7 +37081,7 @@ pub const ActionEntry = extern struct {
     ///   (or `NULL` for no parameter)
     f_parameter_type: ?[*:0]const u8,
     /// the initial state for this action, given in
-    ///   [GVariant text format](gvariant-text-format.html).  The state is parsed
+    ///   [GVariant text format](../glib/gvariant-text-format.html).  The state is parsed
     ///   with no extra type information, so type tags must be added to the string
     ///   if they are necessary.  Stateless actions should give `NULL` here.
     f_state: ?[*:0]const u8,
@@ -37974,14 +37334,14 @@ pub const ApplicationClass = extern struct {
     f_local_command_line: ?*const fn (p_application: *gio.Application, p_arguments: *[*][*:0]u8, p_exit_status: *c_int) callconv(.c) c_int,
     /// invoked on the primary instance before 'activate', 'open',
     ///     'command-line' or any action invocation, gets the 'platform data' from
-    ///     the calling instance
+    ///     the calling instance. Must chain up
     f_before_emit: ?*const fn (p_application: *gio.Application, p_platform_data: *glib.Variant) callconv(.c) void,
     /// invoked on the primary instance after 'activate', 'open',
     ///     'command-line' or any action invocation, gets the 'platform data' from
-    ///     the calling instance
+    ///     the calling instance. Must chain up
     f_after_emit: ?*const fn (p_application: *gio.Application, p_platform_data: *glib.Variant) callconv(.c) void,
     /// invoked (locally) to add 'platform data' to be sent to
-    ///     the primary instance when activating, opening or invoking actions
+    ///     the primary instance when activating, opening or invoking actions. Must chain up
     f_add_platform_data: ?*const fn (p_application: *gio.Application, p_builder: *glib.VariantBuilder) callconv(.c) void,
     /// Used to be invoked on the primary instance when the use
     ///     count of the application drops to zero (and after any inactivity
@@ -38361,11 +37721,11 @@ pub const DBusArgInfo = extern struct {
     }
 };
 
-/// Struct used in `gio.dbusErrorRegisterErrorDomain`.
+/// Struct used in `gio.DBusError.registerErrorDomain`.
 pub const DBusErrorEntry = extern struct {
-    /// An error code.
+    /// an error code
     f_error_code: c_int,
-    /// The D-Bus error name to associate with `error_code`.
+    /// the D-Bus error name to associate with `error_code`
     f_dbus_error_name: ?[*:0]const u8,
 
     test {
@@ -39062,41 +38422,6 @@ pub const DebugControllerInterface = extern struct {
     }
 };
 
-pub const DesktopAppInfoClass = extern struct {
-    pub const Instance = gio.DesktopAppInfo;
-
-    f_parent_class: gobject.ObjectClass,
-
-    pub fn as(p_instance: *DesktopAppInfoClass, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// Interface that is used by backends to associate default
-/// handlers with URI schemes.
-pub const DesktopAppInfoLookupIface = extern struct {
-    pub const Instance = gio.DesktopAppInfoLookup;
-
-    f_g_iface: gobject.TypeInterface,
-    /// Virtual method for
-    ///  `gio.DesktopAppInfoLookup.getDefaultForUriScheme`.
-    f_get_default_for_uri_scheme: ?*const fn (p_lookup: *gio.DesktopAppInfoLookup, p_uri_scheme: [*:0]const u8) callconv(.c) ?*gio.AppInfo,
-
-    pub fn as(p_instance: *DesktopAppInfoLookupIface, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
 /// Interface for creating `gio.Drive` implementations.
 pub const DriveIface = extern struct {
     pub const Instance = gio.Drive;
@@ -39421,25 +38746,6 @@ pub const FileAttributeMatcher = opaque {
 
     extern fn g_file_attribute_matcher_get_type() usize;
     pub const getGObjectType = g_file_attribute_matcher_get_type;
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// An interface for file descriptor based io objects.
-pub const FileDescriptorBasedIface = extern struct {
-    pub const Instance = gio.FileDescriptorBased;
-
-    /// The parent interface.
-    f_g_iface: gobject.TypeInterface,
-    /// Gets the underlying file descriptor.
-    f_get_fd: ?*const fn (p_fd_based: *gio.FileDescriptorBased) callconv(.c) c_int,
-
-    pub fn as(p_instance: *FileDescriptorBasedIface, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
 
     test {
         @setEvalBranchQuota(100_000);
@@ -42838,296 +42144,6 @@ pub const UnixFDListPrivate = opaque {
     }
 };
 
-pub const UnixFDMessageClass = extern struct {
-    pub const Instance = gio.UnixFDMessage;
-
-    f_parent_class: gio.SocketControlMessageClass,
-    f__g_reserved1: ?*const fn () callconv(.c) void,
-    f__g_reserved2: ?*const fn () callconv(.c) void,
-
-    pub fn as(p_instance: *UnixFDMessageClass, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-pub const UnixFDMessagePrivate = opaque {
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-pub const UnixInputStreamClass = extern struct {
-    pub const Instance = gio.UnixInputStream;
-
-    f_parent_class: gio.InputStreamClass,
-    f__g_reserved1: ?*const fn () callconv(.c) void,
-    f__g_reserved2: ?*const fn () callconv(.c) void,
-    f__g_reserved3: ?*const fn () callconv(.c) void,
-    f__g_reserved4: ?*const fn () callconv(.c) void,
-    f__g_reserved5: ?*const fn () callconv(.c) void,
-
-    pub fn as(p_instance: *UnixInputStreamClass, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-pub const UnixInputStreamPrivate = opaque {
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// Defines a Unix mount entry (e.g. `/media/cdrom`).
-/// This corresponds roughly to a mtab entry.
-pub const UnixMountEntry = opaque {
-    /// Gets a `giounix.MountEntry` for a given mount path.
-    ///
-    /// If `time_read` is set, it will be filled with a Unix timestamp for checking
-    /// if the mounts have changed since with
-    /// `GioUnix.mountEntriesChangedSince`.
-    ///
-    /// If more mounts have the same mount path, the last matching mount
-    /// is returned.
-    ///
-    /// This will return `NULL` if there is no mount point at `mount_path`.
-    extern fn g_unix_mount_entry_at(p_mount_path: [*:0]const u8, p_time_read: ?*u64) ?*gio.UnixMountEntry;
-    pub const at = g_unix_mount_entry_at;
-
-    /// Gets a `giounix.MountEntry` for a given file path.
-    ///
-    /// If `time_read` is set, it will be filled with a Unix timestamp for checking
-    /// if the mounts have changed since with
-    /// `GioUnix.mountEntriesChangedSince`.
-    ///
-    /// If more mounts have the same mount path, the last matching mount
-    /// is returned.
-    ///
-    /// This will return `NULL` if looking up the mount entry fails, if
-    /// `file_path` doesn’t exist or there is an I/O error.
-    extern fn g_unix_mount_entry_for(p_file_path: [*:0]const u8, p_time_read: ?*u64) ?*gio.UnixMountEntry;
-    pub const @"for" = g_unix_mount_entry_for;
-
-    /// Compares two Unix mounts.
-    extern fn g_unix_mount_entry_compare(p_mount1: *UnixMountEntry, p_mount2: *gio.UnixMountEntry) c_int;
-    pub const compare = g_unix_mount_entry_compare;
-
-    /// Makes a copy of `mount_entry`.
-    extern fn g_unix_mount_entry_copy(p_mount_entry: *UnixMountEntry) *gio.UnixMountEntry;
-    pub const copy = g_unix_mount_entry_copy;
-
-    /// Frees a Unix mount.
-    extern fn g_unix_mount_entry_free(p_mount_entry: *UnixMountEntry) void;
-    pub const free = g_unix_mount_entry_free;
-
-    /// Gets the device path for a Unix mount.
-    extern fn g_unix_mount_entry_get_device_path(p_mount_entry: *UnixMountEntry) [*:0]const u8;
-    pub const getDevicePath = g_unix_mount_entry_get_device_path;
-
-    /// Gets the filesystem type for the Unix mount.
-    extern fn g_unix_mount_entry_get_fs_type(p_mount_entry: *UnixMountEntry) [*:0]const u8;
-    pub const getFsType = g_unix_mount_entry_get_fs_type;
-
-    /// Gets the mount path for a Unix mount.
-    extern fn g_unix_mount_entry_get_mount_path(p_mount_entry: *UnixMountEntry) [*:0]const u8;
-    pub const getMountPath = g_unix_mount_entry_get_mount_path;
-
-    /// Gets a comma separated list of mount options for the Unix mount.
-    ///
-    /// For example: `rw,relatime,seclabel,data=ordered`.
-    ///
-    /// This is similar to `giounix.MountPoint.getOptions`, but it takes
-    /// a `giounix.MountEntry` as an argument.
-    extern fn g_unix_mount_entry_get_options(p_mount_entry: *UnixMountEntry) ?[*:0]const u8;
-    pub const getOptions = g_unix_mount_entry_get_options;
-
-    /// Gets the root of the mount within the filesystem. This is useful e.g. for
-    /// mounts created by bind operation, or btrfs subvolumes.
-    ///
-    /// For example, the root path is equal to `/` for a mount created by
-    /// `mount /dev/sda1 /mnt/foo` and `/bar` for
-    /// `mount --bind /mnt/foo/bar /mnt/bar`.
-    extern fn g_unix_mount_entry_get_root_path(p_mount_entry: *UnixMountEntry) ?[*:0]const u8;
-    pub const getRootPath = g_unix_mount_entry_get_root_path;
-
-    /// Guesses whether a Unix mount entry can be ejected.
-    extern fn g_unix_mount_entry_guess_can_eject(p_mount_entry: *UnixMountEntry) c_int;
-    pub const guessCanEject = g_unix_mount_entry_guess_can_eject;
-
-    /// Guesses the icon of a Unix mount entry.
-    extern fn g_unix_mount_entry_guess_icon(p_mount_entry: *UnixMountEntry) *gio.Icon;
-    pub const guessIcon = g_unix_mount_entry_guess_icon;
-
-    /// Guesses the name of a Unix mount entry.
-    ///
-    /// The result is a translated string.
-    extern fn g_unix_mount_entry_guess_name(p_mount_entry: *UnixMountEntry) [*:0]u8;
-    pub const guessName = g_unix_mount_entry_guess_name;
-
-    /// Guesses whether a Unix mount entry should be displayed in the UI.
-    extern fn g_unix_mount_entry_guess_should_display(p_mount_entry: *UnixMountEntry) c_int;
-    pub const guessShouldDisplay = g_unix_mount_entry_guess_should_display;
-
-    /// Guesses the symbolic icon of a Unix mount entry.
-    extern fn g_unix_mount_entry_guess_symbolic_icon(p_mount_entry: *UnixMountEntry) *gio.Icon;
-    pub const guessSymbolicIcon = g_unix_mount_entry_guess_symbolic_icon;
-
-    /// Checks if a Unix mount is mounted read only.
-    extern fn g_unix_mount_entry_is_readonly(p_mount_entry: *UnixMountEntry) c_int;
-    pub const isReadonly = g_unix_mount_entry_is_readonly;
-
-    /// Checks if a Unix mount is a system mount.
-    ///
-    /// This is the Boolean OR of
-    /// `GioUnix.isSystemFsType`, `GioUnix.isSystemDevicePath` and
-    /// `GioUnix.isMountPathSystemInternal` on `mount_entry`’s properties.
-    ///
-    /// The definition of what a ‘system’ mount entry is may change over time as new
-    /// file system types and device paths are ignored.
-    extern fn g_unix_mount_entry_is_system_internal(p_mount_entry: *UnixMountEntry) c_int;
-    pub const isSystemInternal = g_unix_mount_entry_is_system_internal;
-
-    extern fn g_unix_mount_entry_get_type() usize;
-    pub const getGObjectType = g_unix_mount_entry_get_type;
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-pub const UnixMountMonitorClass = opaque {
-    pub const Instance = gio.UnixMountMonitor;
-
-    pub fn as(p_instance: *UnixMountMonitorClass, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// Defines a Unix mount point (e.g. `/dev`).
-/// This corresponds roughly to a fstab entry.
-pub const UnixMountPoint = opaque {
-    /// Gets a `giounix.MountPoint` for a given mount path.
-    ///
-    /// If `time_read` is set, it will be filled with a Unix timestamp for checking if
-    /// the mount points have changed since with
-    /// `GioUnix.mountPointsChangedSince`.
-    ///
-    /// If more mount points have the same mount path, the last matching mount point
-    /// is returned.
-    extern fn g_unix_mount_point_at(p_mount_path: [*:0]const u8, p_time_read: ?*u64) ?*gio.UnixMountPoint;
-    pub const at = g_unix_mount_point_at;
-
-    /// Compares two Unix mount points.
-    extern fn g_unix_mount_point_compare(p_mount1: *UnixMountPoint, p_mount2: *gio.UnixMountPoint) c_int;
-    pub const compare = g_unix_mount_point_compare;
-
-    /// Makes a copy of `mount_point`.
-    extern fn g_unix_mount_point_copy(p_mount_point: *UnixMountPoint) *gio.UnixMountPoint;
-    pub const copy = g_unix_mount_point_copy;
-
-    /// Frees a Unix mount point.
-    extern fn g_unix_mount_point_free(p_mount_point: *UnixMountPoint) void;
-    pub const free = g_unix_mount_point_free;
-
-    /// Gets the device path for a Unix mount point.
-    extern fn g_unix_mount_point_get_device_path(p_mount_point: *UnixMountPoint) [*:0]const u8;
-    pub const getDevicePath = g_unix_mount_point_get_device_path;
-
-    /// Gets the file system type for the mount point.
-    extern fn g_unix_mount_point_get_fs_type(p_mount_point: *UnixMountPoint) [*:0]const u8;
-    pub const getFsType = g_unix_mount_point_get_fs_type;
-
-    /// Gets the mount path for a Unix mount point.
-    extern fn g_unix_mount_point_get_mount_path(p_mount_point: *UnixMountPoint) [*:0]const u8;
-    pub const getMountPath = g_unix_mount_point_get_mount_path;
-
-    /// Gets the options for the mount point.
-    extern fn g_unix_mount_point_get_options(p_mount_point: *UnixMountPoint) ?[*:0]const u8;
-    pub const getOptions = g_unix_mount_point_get_options;
-
-    /// Guesses whether a Unix mount point can be ejected.
-    extern fn g_unix_mount_point_guess_can_eject(p_mount_point: *UnixMountPoint) c_int;
-    pub const guessCanEject = g_unix_mount_point_guess_can_eject;
-
-    /// Guesses the icon of a Unix mount point.
-    extern fn g_unix_mount_point_guess_icon(p_mount_point: *UnixMountPoint) *gio.Icon;
-    pub const guessIcon = g_unix_mount_point_guess_icon;
-
-    /// Guesses the name of a Unix mount point.
-    ///
-    /// The result is a translated string.
-    extern fn g_unix_mount_point_guess_name(p_mount_point: *UnixMountPoint) [*:0]u8;
-    pub const guessName = g_unix_mount_point_guess_name;
-
-    /// Guesses the symbolic icon of a Unix mount point.
-    extern fn g_unix_mount_point_guess_symbolic_icon(p_mount_point: *UnixMountPoint) *gio.Icon;
-    pub const guessSymbolicIcon = g_unix_mount_point_guess_symbolic_icon;
-
-    /// Checks if a Unix mount point is a loopback device.
-    extern fn g_unix_mount_point_is_loopback(p_mount_point: *UnixMountPoint) c_int;
-    pub const isLoopback = g_unix_mount_point_is_loopback;
-
-    /// Checks if a Unix mount point is read only.
-    extern fn g_unix_mount_point_is_readonly(p_mount_point: *UnixMountPoint) c_int;
-    pub const isReadonly = g_unix_mount_point_is_readonly;
-
-    /// Checks if a Unix mount point is mountable by the user.
-    extern fn g_unix_mount_point_is_user_mountable(p_mount_point: *UnixMountPoint) c_int;
-    pub const isUserMountable = g_unix_mount_point_is_user_mountable;
-
-    extern fn g_unix_mount_point_get_type() usize;
-    pub const getGObjectType = g_unix_mount_point_get_type;
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-pub const UnixOutputStreamClass = extern struct {
-    pub const Instance = gio.UnixOutputStream;
-
-    f_parent_class: gio.OutputStreamClass,
-    f__g_reserved1: ?*const fn () callconv(.c) void,
-    f__g_reserved2: ?*const fn () callconv(.c) void,
-    f__g_reserved3: ?*const fn () callconv(.c) void,
-    f__g_reserved4: ?*const fn () callconv(.c) void,
-    f__g_reserved5: ?*const fn () callconv(.c) void,
-
-    pub fn as(p_instance: *UnixOutputStreamClass, comptime P_T: type) *P_T {
-        return gobject.ext.as(P_T, p_instance);
-    }
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-pub const UnixOutputStreamPrivate = opaque {
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
 pub const UnixSocketAddressClass = extern struct {
     pub const Instance = gio.UnixSocketAddress;
 
@@ -43421,14 +42437,17 @@ pub const DBusError = enum(c_int) {
     property_read_only = 44,
     _,
 
-    /// Creates a D-Bus error name to use for `error`. If `error` matches
-    /// a registered error (cf. `gio.dbusErrorRegisterError`), the corresponding
-    /// D-Bus error name will be returned.
+    /// Creates a D-Bus error name to use for `error`.
+    ///
+    /// If `error` matches a registered error (see
+    /// `gio.DBusError.registerError`), the corresponding D-Bus error name
+    /// will be returned.
     ///
     /// Otherwise the a name of the form
     /// `org.gtk.GDBus.UnmappedGError.Quark._ESCAPED_QUARK_NAME.Code_ERROR_CODE`
     /// will be used. This allows other GDBus applications to map the error
-    /// on the wire back to a `glib.Error` using `gio.dbusErrorNewForDbusError`.
+    /// on the wire back to a `glib.Error` using
+    /// `gio.DBusError.newForDbusError`.
     ///
     /// This function is typically only used in object mappings to put a
     /// `glib.Error` on the wire. Regular applications should not use it.
@@ -43438,76 +42457,87 @@ pub const DBusError = enum(c_int) {
     /// Gets the D-Bus error name used for `error`, if any.
     ///
     /// This function is guaranteed to return a D-Bus error name for all
-    /// `GErrors` returned from functions handling remote method calls
-    /// (e.g. `gio.DBusConnection.callFinish`) unless
-    /// `gio.dbusErrorStripRemoteError` has been used on `error`.
+    /// `glib.Error`s returned from functions handling remote method calls
+    /// (for example, `gio.DBusConnection.callFinish`) unless
+    /// `gio.DBusError.stripRemoteError` has already been used on `error`.
     extern fn g_dbus_error_get_remote_error(p_error: *const glib.Error) ?[*:0]u8;
     pub const getRemoteError = g_dbus_error_get_remote_error;
 
-    /// Checks if `error` represents an error received via D-Bus from a remote peer. If so,
-    /// use `gio.dbusErrorGetRemoteError` to get the name of the error.
+    /// Checks if `error` represents an error received via D-Bus from a remote peer.
+    ///
+    /// If so, use `gio.DBusError.getRemoteError` to get the name of the error.
     extern fn g_dbus_error_is_remote_error(p_error: *const glib.Error) c_int;
     pub const isRemoteError = g_dbus_error_is_remote_error;
 
     /// Creates a `glib.Error` based on the contents of `dbus_error_name` and
     /// `dbus_error_message`.
     ///
-    /// Errors registered with `gio.dbusErrorRegisterError` will be looked
+    /// Errors registered with `gio.DBusError.registerError` will be looked
     /// up using `dbus_error_name` and if a match is found, the error domain
-    /// and code is used. Applications can use `gio.dbusErrorGetRemoteError`
+    /// and code is used. Applications can use `gio.DBusError.getRemoteError`
     /// to recover `dbus_error_name`.
     ///
     /// If a match against a registered error is not found and the D-Bus
-    /// error name is in a form as returned by `gio.dbusErrorEncodeGerror`
+    /// error name is in a form as returned by `gio.DBusError.encodeGerror`
     /// the error domain and code encoded in the name is used to
-    /// create the `glib.Error`. Also, `dbus_error_name` is added to the error message
-    /// such that it can be recovered with `gio.dbusErrorGetRemoteError`.
+    /// create the `glib.Error`. Also, `dbus_error_name` is added to the error
+    /// message such that it can be recovered with
+    /// `gio.DBusError.getRemoteError`.
     ///
-    /// Otherwise, a `glib.Error` with the error code `G_IO_ERROR_DBUS_ERROR`
-    /// in the `G_IO_ERROR` error domain is returned. Also, `dbus_error_name` is
+    /// Otherwise, a `glib.Error` with the error code
+    /// `gio.@"IOErrorEnum.DBUS_ERROR"`
+    /// in the `gio.IOErrorEnum` error domain is returned. Also, `dbus_error_name` is
     /// added to the error message such that it can be recovered with
-    /// `gio.dbusErrorGetRemoteError`.
+    /// `gio.DBusError.getRemoteError`.
     ///
     /// In all three cases, `dbus_error_name` can always be recovered from the
-    /// returned `glib.Error` using the `gio.dbusErrorGetRemoteError` function
-    /// (unless `gio.dbusErrorStripRemoteError` hasn't been used on the returned error).
+    /// returned `glib.Error` using the `gio.DBusError.getRemoteError`
+    /// function (unless `gio.DBusError.stripRemoteError` hasn’t been used on
+    /// the returned error).
     ///
     /// This function is typically only used in object mappings to prepare
-    /// `glib.Error` instances for applications. Regular applications should not use
-    /// it.
+    /// `glib.Error` instances for applications. Regular applications should not
+    /// use it.
     extern fn g_dbus_error_new_for_dbus_error(p_dbus_error_name: [*:0]const u8, p_dbus_error_message: [*:0]const u8) *glib.Error;
     pub const newForDbusError = g_dbus_error_new_for_dbus_error;
 
     extern fn g_dbus_error_quark() glib.Quark;
     pub const quark = g_dbus_error_quark;
 
-    /// Creates an association to map between `dbus_error_name` and
-    /// `GErrors` specified by `error_domain` and `error_code`.
+    /// Creates an association mapping between `dbus_error_name` and
+    /// `glib.Error`s specified by `error_domain` and `error_code`.
     ///
-    /// This is typically done in the routine that returns the `glib.Quark` for
+    /// This is typically done in the function that returns the `glib.Quark` for
     /// an error domain.
     extern fn g_dbus_error_register_error(p_error_domain: glib.Quark, p_error_code: c_int, p_dbus_error_name: [*:0]const u8) c_int;
     pub const registerError = g_dbus_error_register_error;
 
-    /// Helper function for associating a `glib.Error` error domain with D-Bus error names.
+    /// Helper function for associating a `glib.Error` error domain with D-Bus
+    /// error names.
     ///
     /// While `quark_volatile` has a `volatile` qualifier, this is a historical
     /// artifact and the argument passed to it should not be `volatile`.
     extern fn g_dbus_error_register_error_domain(p_error_domain_quark_name: [*:0]const u8, p_quark_volatile: *usize, p_entries: [*]const gio.DBusErrorEntry, p_num_entries: c_uint) void;
     pub const registerErrorDomain = g_dbus_error_register_error_domain;
 
-    /// Does nothing if `error` is `NULL`. Otherwise sets `*error` to
-    /// a new `glib.Error` created with `gio.dbusErrorNewForDbusError`
-    /// with `dbus_error_message` prepend with `format` (unless `NULL`).
-    extern fn g_dbus_error_set_dbus_error(p_error: **glib.Error, p_dbus_error_name: [*:0]const u8, p_dbus_error_message: [*:0]const u8, p_format: ?[*:0]const u8, ...) void;
+    /// Sets `*error` to a new `glib.Error` created with
+    /// `gio.DBusError.newForDbusError`.
+    ///
+    /// If `format` is non-`NULL` then it is prepended to `dbus_error_message`.
+    /// Otherwise `dbus_error_message` is used unmodified.
+    ///
+    /// This function does nothing if `error` is `NULL`.
+    extern fn g_dbus_error_set_dbus_error(p_error: ?**glib.Error, p_dbus_error_name: [*:0]const u8, p_dbus_error_message: [*:0]const u8, p_format: ?[*:0]const u8, ...) void;
     pub const setDbusError = g_dbus_error_set_dbus_error;
 
     /// Like `gio.DBusError.setDbusError` but intended for language bindings.
-    extern fn g_dbus_error_set_dbus_error_valist(p_error: **glib.Error, p_dbus_error_name: [*:0]const u8, p_dbus_error_message: [*:0]const u8, p_format: ?[*:0]const u8, p_var_args: std.builtin.VaList) void;
+    extern fn g_dbus_error_set_dbus_error_valist(p_error: ?**glib.Error, p_dbus_error_name: [*:0]const u8, p_dbus_error_message: [*:0]const u8, p_format: ?[*:0]const u8, p_var_args: std.builtin.VaList) void;
     pub const setDbusErrorValist = g_dbus_error_set_dbus_error_valist;
 
     /// Looks for extra information in the error message used to recover
-    /// the D-Bus error name and strips it if found. If stripped, the
+    /// the D-Bus error name and strips it if found.
+    ///
+    /// If stripped, the
     /// message field in `error` will correspond exactly to what was
     /// received on the wire.
     ///
@@ -43515,7 +42545,8 @@ pub const DBusError = enum(c_int) {
     extern fn g_dbus_error_strip_remote_error(p_error: *glib.Error) c_int;
     pub const stripRemoteError = g_dbus_error_strip_remote_error;
 
-    /// Destroys an association previously set up with `gio.dbusErrorRegisterError`.
+    /// Destroys an association previously set up with
+    /// `gio.DBusError.registerError`.
     extern fn g_dbus_error_unregister_error(p_error_domain: glib.Quark, p_error_code: c_int, p_dbus_error_name: [*:0]const u8) c_int;
     pub const unregisterError = g_dbus_error_unregister_error;
 
@@ -47088,243 +46119,6 @@ pub const simpleAsyncReportGerrorInIdle = g_simple_async_report_gerror_in_idle;
 extern fn g_simple_async_report_take_gerror_in_idle(p_object: ?*gobject.Object, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque, p_error: *glib.Error) void;
 pub const simpleAsyncReportTakeGerrorInIdle = g_simple_async_report_take_gerror_in_idle;
 
-/// Determines if `mount_path` is considered an implementation of the
-/// OS.
-///
-/// This is primarily used for hiding mountable and mounted volumes
-/// that only are used in the OS and has little to no relevance to the
-/// casual user.
-extern fn g_unix_is_mount_path_system_internal(p_mount_path: [*:0]const u8) c_int;
-pub const unixIsMountPathSystemInternal = g_unix_is_mount_path_system_internal;
-
-/// Determines if `device_path` is considered a block device path which is only
-/// used in implementation of the OS.
-///
-/// This is primarily used for hiding mounted volumes that are intended as APIs
-/// for programs to read, and system administrators at a shell; rather than
-/// something that should, for example, appear in a GUI. For example, the Linux
-/// `/proc` filesystem.
-///
-/// The list of device paths considered ‘system’ ones may change over time.
-extern fn g_unix_is_system_device_path(p_device_path: [*:0]const u8) c_int;
-pub const unixIsSystemDevicePath = g_unix_is_system_device_path;
-
-/// Determines if `fs_type` is considered a type of file system which is only
-/// used in implementation of the OS.
-///
-/// This is primarily used for hiding mounted volumes that are intended as APIs
-/// for programs to read, and system administrators at a shell; rather than
-/// something that should, for example, appear in a GUI. For example, the Linux
-/// `/proc` filesystem.
-///
-/// The list of file system types considered ‘system’ ones may change over time.
-extern fn g_unix_is_system_fs_type(p_fs_type: [*:0]const u8) c_int;
-pub const unixIsSystemFsType = g_unix_is_system_fs_type;
-
-/// Gets a `giounix.MountEntry` for a given mount path.
-///
-/// If `time_read` is set, it will be filled with a Unix timestamp for checking
-/// if the mounts have changed since with
-/// `GioUnix.mountEntriesChangedSince`.
-///
-/// If more mounts have the same mount path, the last matching mount
-/// is returned.
-///
-/// This will return `NULL` if there is no mount point at `mount_path`.
-extern fn g_unix_mount_at(p_mount_path: [*:0]const u8, p_time_read: ?*u64) ?*gio.UnixMountEntry;
-pub const unixMountAt = g_unix_mount_at;
-
-/// Compares two Unix mounts.
-extern fn g_unix_mount_compare(p_mount1: *gio.UnixMountEntry, p_mount2: *gio.UnixMountEntry) c_int;
-pub const unixMountCompare = g_unix_mount_compare;
-
-/// Makes a copy of `mount_entry`.
-extern fn g_unix_mount_copy(p_mount_entry: *gio.UnixMountEntry) *gio.UnixMountEntry;
-pub const unixMountCopy = g_unix_mount_copy;
-
-/// Checks if the Unix mounts have changed since a given Unix time.
-///
-/// This can only work reliably if a `giounix.MountMonitor` is running in
-/// the process, otherwise changes in the mount entries file (such as
-/// `/proc/self/mountinfo` on Linux) cannot be detected and, as a result, this
-/// function has to conservatively always return `TRUE`.
-///
-/// It is more efficient to use `giounix.MountMonitor.signals.mounts_changed` to
-/// be signalled of changes to the mount entries, rather than polling using this
-/// function. This function is more appropriate for infrequently determining
-/// cache validity.
-extern fn g_unix_mount_entries_changed_since(p_time: u64) c_int;
-pub const unixMountEntriesChangedSince = g_unix_mount_entries_changed_since;
-
-/// Gets a list of `giounix.MountEntry` instances representing the Unix
-/// mounts.
-///
-/// If `time_read` is set, it will be filled with the mount timestamp, allowing
-/// for checking if the mounts have changed with
-/// `GioUnix.mountEntriesChangedSince`.
-extern fn g_unix_mount_entries_get(p_time_read: ?*u64) *glib.List;
-pub const unixMountEntriesGet = g_unix_mount_entries_get;
-
-/// Gets an array of `gio.UnixMountEntry`s containing the Unix mounts
-/// listed in `table_path`.
-///
-/// This is a generalized version of `GioUnix.mountEntriesGet`, mainly
-/// intended for internal testing use. Note that `GioUnix.mountEntriesGet`
-/// may parse multiple hierarchical table files, so this function is not a direct
-/// superset of its functionality.
-///
-/// If there is an error reading or parsing the file, `NULL` will be returned
-/// and both out parameters will be set to `0`.
-extern fn g_unix_mount_entries_get_from_file(p_table_path: [*:0]const u8, p_time_read_out: ?*u64, p_n_entries_out: ?*usize) ?[*]*gio.UnixMountEntry;
-pub const unixMountEntriesGetFromFile = g_unix_mount_entries_get_from_file;
-
-/// Gets a `giounix.MountEntry` for a given file path.
-///
-/// If `time_read` is set, it will be filled with a Unix timestamp for checking
-/// if the mounts have changed since with
-/// `GioUnix.mountEntriesChangedSince`.
-///
-/// If more mounts have the same mount path, the last matching mount
-/// is returned.
-///
-/// This will return `NULL` if looking up the mount entry fails, if
-/// `file_path` doesn’t exist or there is an I/O error.
-extern fn g_unix_mount_for(p_file_path: [*:0]const u8, p_time_read: ?*u64) ?*gio.UnixMountEntry;
-pub const unixMountFor = g_unix_mount_for;
-
-/// Frees a Unix mount.
-extern fn g_unix_mount_free(p_mount_entry: *gio.UnixMountEntry) void;
-pub const unixMountFree = g_unix_mount_free;
-
-/// Gets the device path for a Unix mount.
-extern fn g_unix_mount_get_device_path(p_mount_entry: *gio.UnixMountEntry) [*:0]const u8;
-pub const unixMountGetDevicePath = g_unix_mount_get_device_path;
-
-/// Gets the filesystem type for the Unix mount.
-extern fn g_unix_mount_get_fs_type(p_mount_entry: *gio.UnixMountEntry) [*:0]const u8;
-pub const unixMountGetFsType = g_unix_mount_get_fs_type;
-
-/// Gets the mount path for a Unix mount.
-extern fn g_unix_mount_get_mount_path(p_mount_entry: *gio.UnixMountEntry) [*:0]const u8;
-pub const unixMountGetMountPath = g_unix_mount_get_mount_path;
-
-/// Gets a comma separated list of mount options for the Unix mount.
-///
-/// For example: `rw,relatime,seclabel,data=ordered`.
-///
-/// This is similar to `giounix.MountPoint.getOptions`, but it takes
-/// a `giounix.MountEntry` as an argument.
-extern fn g_unix_mount_get_options(p_mount_entry: *gio.UnixMountEntry) ?[*:0]const u8;
-pub const unixMountGetOptions = g_unix_mount_get_options;
-
-/// Gets the root of the mount within the filesystem. This is useful e.g. for
-/// mounts created by bind operation, or btrfs subvolumes.
-///
-/// For example, the root path is equal to `/` for a mount created by
-/// `mount /dev/sda1 /mnt/foo` and `/bar` for
-/// `mount --bind /mnt/foo/bar /mnt/bar`.
-extern fn g_unix_mount_get_root_path(p_mount_entry: *gio.UnixMountEntry) ?[*:0]const u8;
-pub const unixMountGetRootPath = g_unix_mount_get_root_path;
-
-/// Guesses whether a Unix mount entry can be ejected.
-extern fn g_unix_mount_guess_can_eject(p_mount_entry: *gio.UnixMountEntry) c_int;
-pub const unixMountGuessCanEject = g_unix_mount_guess_can_eject;
-
-/// Guesses the icon of a Unix mount entry.
-extern fn g_unix_mount_guess_icon(p_mount_entry: *gio.UnixMountEntry) *gio.Icon;
-pub const unixMountGuessIcon = g_unix_mount_guess_icon;
-
-/// Guesses the name of a Unix mount entry.
-///
-/// The result is a translated string.
-extern fn g_unix_mount_guess_name(p_mount_entry: *gio.UnixMountEntry) [*:0]u8;
-pub const unixMountGuessName = g_unix_mount_guess_name;
-
-/// Guesses whether a Unix mount entry should be displayed in the UI.
-extern fn g_unix_mount_guess_should_display(p_mount_entry: *gio.UnixMountEntry) c_int;
-pub const unixMountGuessShouldDisplay = g_unix_mount_guess_should_display;
-
-/// Guesses the symbolic icon of a Unix mount entry.
-extern fn g_unix_mount_guess_symbolic_icon(p_mount_entry: *gio.UnixMountEntry) *gio.Icon;
-pub const unixMountGuessSymbolicIcon = g_unix_mount_guess_symbolic_icon;
-
-/// Checks if a Unix mount is mounted read only.
-extern fn g_unix_mount_is_readonly(p_mount_entry: *gio.UnixMountEntry) c_int;
-pub const unixMountIsReadonly = g_unix_mount_is_readonly;
-
-/// Checks if a Unix mount is a system mount.
-///
-/// This is the Boolean OR of
-/// `GioUnix.isSystemFsType`, `GioUnix.isSystemDevicePath` and
-/// `GioUnix.isMountPathSystemInternal` on `mount_entry`’s properties.
-///
-/// The definition of what a ‘system’ mount entry is may change over time as new
-/// file system types and device paths are ignored.
-extern fn g_unix_mount_is_system_internal(p_mount_entry: *gio.UnixMountEntry) c_int;
-pub const unixMountIsSystemInternal = g_unix_mount_is_system_internal;
-
-/// Checks if the Unix mount points have changed since a given Unix time.
-///
-/// Unlike `GioUnix.mountEntriesChangedSince`, this function can work
-/// reliably without a `giounix.MountMonitor` running, as it accesses the
-/// static mount point information (such as `/etc/fstab` on Linux), which has a
-/// valid modification time.
-///
-/// It is more efficient to use `giounix.MountMonitor.signals.mountpoints_changed`
-/// to be signalled of changes to the mount points, rather than polling using
-/// this function. This function is more appropriate for infrequently determining
-/// cache validity.
-extern fn g_unix_mount_points_changed_since(p_time: u64) c_int;
-pub const unixMountPointsChangedSince = g_unix_mount_points_changed_since;
-
-/// Gets a list of `giounix.MountPoint` instances representing the Unix
-/// mount points.
-///
-/// If `time_read` is set, it will be filled with the mount timestamp, allowing
-/// for checking if the mounts have changed with
-/// `GioUnix.mountPointsChangedSince`.
-extern fn g_unix_mount_points_get(p_time_read: ?*u64) *glib.List;
-pub const unixMountPointsGet = g_unix_mount_points_get;
-
-/// Gets an array of `gio.UnixMountPoint`s containing the Unix mount
-/// points listed in `table_path`.
-///
-/// This is a generalized version of `GioUnix.mountPointsGet`, mainly
-/// intended for internal testing use. Note that `GioUnix.mountPointsGet`
-/// may parse multiple hierarchical table files, so this function is not a direct
-/// superset of its functionality.
-///
-/// If there is an error reading or parsing the file, `NULL` will be returned
-/// and both out parameters will be set to `0`.
-extern fn g_unix_mount_points_get_from_file(p_table_path: [*:0]const u8, p_time_read_out: ?*u64, p_n_points_out: ?*usize) ?[*]*gio.UnixMountPoint;
-pub const unixMountPointsGetFromFile = g_unix_mount_points_get_from_file;
-
-/// Checks if the Unix mounts have changed since a given Unix time.
-extern fn g_unix_mounts_changed_since(p_time: u64) c_int;
-pub const unixMountsChangedSince = g_unix_mounts_changed_since;
-
-/// Gets a list of `giounix.MountEntry` instances representing the Unix
-/// mounts.
-///
-/// If `time_read` is set, it will be filled with the mount timestamp, allowing
-/// for checking if the mounts have changed with
-/// `GioUnix.mountEntriesChangedSince`.
-extern fn g_unix_mounts_get(p_time_read: ?*u64) *glib.List;
-pub const unixMountsGet = g_unix_mounts_get;
-
-/// Gets an array of `gio.UnixMountEntry`s containing the Unix mounts
-/// listed in `table_path`.
-///
-/// This is a generalized version of `GioUnix.mountEntriesGet`, mainly
-/// intended for internal testing use. Note that `GioUnix.mountEntriesGet`
-/// may parse multiple hierarchical table files, so this function is not a direct
-/// superset of its functionality.
-///
-/// If there is an error reading or parsing the file, `NULL` will be returned
-/// and both out parameters will be set to `0`.
-extern fn g_unix_mounts_get_from_file(p_table_path: [*:0]const u8, p_time_read_out: ?*u64, p_n_entries_out: ?*usize) ?[*]*gio.UnixMountEntry;
-pub const unixMountsGetFromFile = g_unix_mounts_get_from_file;
-
 /// Type definition for a function that will be called back when an asynchronous
 /// operation within GIO has been completed. `gio.AsyncReadyCallback`
 /// callbacks from `gio.Task` are guaranteed to be invoked in a later
@@ -47494,11 +46288,6 @@ pub const DBusSubtreeIntrospectFunc = *const fn (p_connection: *gio.DBusConnecti
 /// returned by `gio.DatagramBased.createSource`.
 pub const DatagramBasedSourceFunc = *const fn (p_datagram_based: *gio.DatagramBased, p_condition: glib.IOCondition, p_data: ?*anyopaque) callconv(.c) c_int;
 
-/// During invocation, `gio.DesktopAppInfo.launchUrisAsManager` may
-/// create one or more child processes.  This callback is invoked once
-/// for each, providing the process ID.
-pub const DesktopAppLaunchCallback = *const fn (p_appinfo: *gio.DesktopAppInfo, p_pid: glib.Pid, p_user_data: ?*anyopaque) callconv(.c) void;
-
 /// This callback type is used by `gio.File.measureDiskUsage` to make
 /// periodic progress reports when measuring the amount of disk spaced
 /// used by a directory.
@@ -47635,9 +46424,6 @@ pub const DBUS_METHOD_INVOCATION_UNHANDLED = false;
 /// Extension point for debug control functionality.
 /// See [Extending GIO](overview.html`extending`-gio).
 pub const DEBUG_CONTROLLER_EXTENSION_POINT_NAME = "gio-debug-controller";
-/// Extension point for default handler to URI association. See
-/// [Extending GIO](overview.html`extending`-gio).
-pub const DESKTOP_APP_INFO_LOOKUP_EXTENSION_POINT_NAME = "gio-desktop-app-info-lookup";
 /// The string used to obtain a Unix device path with `gio.Drive.getIdentifier`.
 pub const DRIVE_IDENTIFIER_KIND_UNIX_DEVICE = "unix-device";
 /// A key in the "access" namespace for checking deletion privileges.

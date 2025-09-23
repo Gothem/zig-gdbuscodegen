@@ -76,7 +76,7 @@ fn ping(dbus: *DBusTest.Skeleton, o_invocation: ?*gio.DBusMethodInvocation, msg:
     loop.quit();
 }
 
-fn onBusAcquired(bus: *gio.DBusConnection, _: [*:0]const u8, p_dbus: ?*anyopaque) callconv(.C) void {
+fn onBusAcquired(bus: *gio.DBusConnection, _: [*:0]const u8, p_dbus: ?*anyopaque) callconv(.c) void {
     const dbus: *DBusTest.Skeleton = @ptrCast(@alignCast(p_dbus));
     log.debug("onBusAcquired", .{});
 
@@ -84,14 +84,14 @@ fn onBusAcquired(bus: *gio.DBusConnection, _: [*:0]const u8, p_dbus: ?*anyopaque
     _ = dbus.as(gio.DBusInterfaceSkeleton).@"export"(bus, "/Test", &gliberror);
 }
 
-fn onNameAcquired(_: *gio.DBusConnection, name: [*:0]const u8, _: ?*anyopaque) callconv(.C) void {
+fn onNameAcquired(_: *gio.DBusConnection, name: [*:0]const u8, _: ?*anyopaque) callconv(.c) void {
     log.debug("onNameAcquired: {s}", .{name});
 }
 
-fn onNameLost(_: *gio.DBusConnection, name: [*:0]const u8, _: ?*anyopaque) callconv(.C) void {
+fn onNameLost(_: *gio.DBusConnection, name: [*:0]const u8, _: ?*anyopaque) callconv(.c) void {
     log.debug("onNameLost: {s}", .{name});
 }
 
-fn onUserDataDestroy(_: ?*anyopaque) callconv(.C) void {
+fn onUserDataDestroy(_: ?*anyopaque) callconv(.c) void {
     log.debug("onUserDataDestroy", .{});
 }

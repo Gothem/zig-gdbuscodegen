@@ -11,8 +11,9 @@ pub const Interface = struct {
 
     pub fn deinit(self: *@This()) void {
         const allocator = self.arena.child_allocator;
-        self.arena.deinit();
-        allocator.destroy(self.arena);
+        const arena = self.arena;
+        arena.deinit();
+        allocator.destroy(arena);
     }
 };
 const Arg = struct {
@@ -60,13 +61,13 @@ pub fn newFromNode(gpa: std.mem.Allocator, node: *xml.Node) !*Interface {
     interface.* = .{
         .service_name = (node.attributes.getEntry("name") orelse return error.NoInterfaceName).value_ptr.*,
         .name = interface.service_name[std.mem.lastIndexOfScalar(u8, interface.service_name, '.').? + 1 ..],
-        .methods = std.ArrayList(Method).init(allocator),
-        .properties = std.ArrayList(Property).init(allocator),
-        .signals = std.ArrayList(Signal).init(allocator),
+        .methods = .empty,
+        .properties = .empty,
+        .signals = .empty,
         .arena = arena,
     };
-    const redundant_words = try getRedundantWords(allocator, interface.name);
-    defer redundant_words.deinit();
+    var redundant_words = try getRedundantWords(allocator, interface.name);
+    defer redundant_words.deinit(allocator);
 
     for (node.childrens.items) |child| {
         const child_name = child.attributes.getEntry("name").?.value_ptr.*;
@@ -97,7 +98,7 @@ pub fn newFromNode(gpa: std.mem.Allocator, node: *xml.Node) !*Interface {
             }
             std.debug.print(")\n", .{});
 
-            try interface.methods.append(.{
+            try interface.methods.append(allocator, .{
                 .name = child_name,
                 .in_args = in_args,
                 .out_args = out_args,
@@ -105,18 +106,18 @@ pub fn newFromNode(gpa: std.mem.Allocator, node: *xml.Node) !*Interface {
         }
         if (std.mem.eql(u8, child.name, "signal")) {
             const nick = try removeRedundantWords(allocator, child_name, redundant_words.items, true);
-            var args = std.ArrayList(Arg).init(allocator);
+            var args: std.ArrayList(Arg) = .empty;
             for (child.childrens.items) |arg| {
                 const signature = arg.attributes.getEntry("type").?.value_ptr.*;
                 const zig_type = signatureToZigType(signature);
 
-                try args.append(.{
+                try args.append(allocator, .{
                     .signature = signature,
                     .zig_type = zig_type,
                 });
             }
 
-            try interface.signals.append(.{
+            try interface.signals.append(allocator, .{
                 .name = child_name,
                 .nick = nick,
                 .args = args,
@@ -147,7 +148,7 @@ pub fn newFromNode(gpa: std.mem.Allocator, node: *xml.Node) !*Interface {
                 access = Access.readwrite;
             }
 
-            try interface.properties.append(.{
+            try interface.properties.append(allocator, .{
                 .name = child_name,
                 .nick = nick,
                 .signature = signature,
@@ -184,8 +185,8 @@ fn signatureToZigType(signature: []const u8) []const u8 {
 }
 
 fn getRedundantWords(allocator: std.mem.Allocator, values: []const u8) !std.ArrayList([]const u8) {
-    var words = std.ArrayList([]const u8).init(allocator);
-    try words.append("Is");
+    var words: std.ArrayList([]const u8) = .empty;
+    try words.append(allocator, "Is");
 
     const lowered_values = try std.ascii.allocLowerString(allocator, values);
     defer allocator.free(lowered_values);
@@ -195,7 +196,7 @@ fn getRedundantWords(allocator: std.mem.Allocator, values: []const u8) !std.Arra
     while (start < values.len) {
         const diff = std.mem.indexOfDiff(u8, values[start + 1 ..], lowered_values[start + 1 ..]);
         end = if (diff) |idx| idx + start + 1 else values.len;
-        try words.append(values[start..end]);
+        try words.append(allocator, values[start..end]);
         start = end;
     }
 

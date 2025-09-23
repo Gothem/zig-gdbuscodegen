@@ -1,12 +1,12 @@
 .{
     .name = .gdbuscodegen,
     .fingerprint = 0x564551a5f5a70905,
-    .version = "0.1.6",
-    .minimum_zig_version = "0.14.0",
+    .version = "0.1.7",
+    .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .xml = .{
-            .url = "https://github.com/Gothem/zig-xml/archive/refs/tags/0.1.2.tar.gz",
-            .hash = "xml-0.1.0-MHdXStAUAAB7ljm3bYClwjeC3xcK-LB_Lhg2Jl3qyqNm",
+            .url = "https://github.com/Gothem/zig-xml/archive/refs/tags/0.1.3.tar.gz",
+            .hash = "xml-0.1.3-MHdXStsUAAD0oMcWPAXUC6FVY4NkFPqeJikNweEFat1s",
         },
     },
     .paths = .{

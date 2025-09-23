@@ -7,6 +7,10 @@ const glib = @import("glib2");
 /// The `gmodule.Module` struct is an opaque data structure to represent a
 /// [dynamically-loaded module](modules.html`dynamic`-loading-of-modules).
 /// It should only be accessed via the following functions.
+///
+/// To ensure correct lock ordering, these functions must not be called from
+/// global constructors (for example, those using GCC’s
+/// `__attribute__((constructor))` attribute).
 pub const Module = opaque {
     /// A portable way to build the filename of a module. The platform-specific
     /// prefix and suffix are added to the filename, if needed, and the result
