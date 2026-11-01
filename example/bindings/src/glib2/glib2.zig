@@ -1299,6 +1299,21 @@ pub const Bytes = opaque {
     extern fn g_bytes_new(p_data: ?[*]const u8, p_size: usize) *glib.Bytes;
     pub const new = g_bytes_new;
 
+    /// Creates a `glib.Bytes` which is a subsection of another `GBytes`.
+    ///
+    /// The `offset` + `length` may not be longer than the size of `bytes`.
+    ///
+    /// A reference to `bytes` will be held by the newly created `GBytes` until
+    /// the byte data is no longer needed.
+    ///
+    /// Since 2.56, if `offset` is 0 and `length` matches the size of `bytes`, then
+    /// `bytes` will be returned with the reference count incremented by 1. If `bytes`
+    /// is a slice of another `GBytes`, then the resulting `GBytes` will reference
+    /// the same `GBytes` instead of `bytes`. This allows consumers to simplify the
+    /// usage of `GBytes` when asynchronously writing to streams.
+    extern fn g_bytes_new_from_bytes(p_bytes: *glib.Bytes, p_offset: usize, p_length: usize) *glib.Bytes;
+    pub const newFromBytes = g_bytes_new_from_bytes;
+
     /// Creates a new `glib.Bytes` from static data.
     ///
     /// `data` must be static (ie: never modified or freed). It may be `NULL` if `size`
@@ -1401,21 +1416,6 @@ pub const Bytes = opaque {
     /// a `glib.HashTable`.
     extern fn g_bytes_hash(p_bytes: *const Bytes) c_uint;
     pub const hash = g_bytes_hash;
-
-    /// Creates a `glib.Bytes` which is a subsection of another `GBytes`.
-    ///
-    /// The `offset` + `length` may not be longer than the size of `bytes`.
-    ///
-    /// A reference to `bytes` will be held by the newly created `GBytes` until
-    /// the byte data is no longer needed.
-    ///
-    /// Since 2.56, if `offset` is 0 and `length` matches the size of `bytes`, then
-    /// `bytes` will be returned with the reference count incremented by 1. If `bytes`
-    /// is a slice of another `GBytes`, then the resulting `GBytes` will reference
-    /// the same `GBytes` instead of `bytes`. This allows consumers to simplify the
-    /// usage of `GBytes` when asynchronously writing to streams.
-    extern fn g_bytes_new_from_bytes(p_bytes: *Bytes, p_offset: usize, p_length: usize) *glib.Bytes;
-    pub const newFromBytes = g_bytes_new_from_bytes;
 
     /// Increase the reference count on `bytes`.
     extern fn g_bytes_ref(p_bytes: *Bytes) *glib.Bytes;
@@ -2600,14 +2600,24 @@ pub const DateTime = opaque {
     extern fn g_date_time_add_years(p_datetime: *DateTime, p_years: c_int) ?*glib.DateTime;
     pub const addYears = g_date_time_add_years;
 
-    /// A comparison function for `GDateTimes` that is suitable
-    /// as a `glib.CompareFunc`. Both `GDateTimes` must be non-`NULL`.
+    /// A comparison function for date-times that is suitable
+    /// as a `glib.CompareFunc`.
+    ///
+    /// This effectively converts both date-times to the same time zone before
+    /// comparing, so date-times in different time zones can compare equal if they
+    /// refer to the same instant. See `glib.DateTime.difference`.
+    ///
+    /// Both date-times must be non-`NULL`.
     extern fn g_date_time_compare(p_dt1: *const DateTime, p_dt2: *const glib.DateTime) c_int;
     pub const compare = g_date_time_compare;
 
-    /// Calculates the difference in time between `end` and `begin`.  The
-    /// `glib.TimeSpan` that is returned is effectively `end` - `begin` (ie:
-    /// positive if the first parameter is larger).
+    /// Calculates the difference in time between `end` and `begin`.
+    ///
+    /// The time span that is returned is effectively `end` - `begin` (positive if the
+    /// first parameter is larger).
+    ///
+    /// This effectively converts both date-times to the same time zone before
+    /// calculating the difference.
     extern fn g_date_time_difference(p_end: *DateTime, p_begin: *glib.DateTime) glib.TimeSpan;
     pub const difference = g_date_time_difference;
 
@@ -2615,6 +2625,11 @@ pub const DateTime = opaque {
     ///
     /// Equal here means that they represent the same moment after converting
     /// them to the same time zone.
+    ///
+    /// If you need to check that the date-times are in the same time zone as well
+    /// as referring to the same instant in time, additionally compare the values
+    /// returned by `glib.TimeZone.getOffset` for the time zones for the two
+    /// date-times.
     extern fn g_date_time_equal(p_dt1: *const DateTime, p_dt2: *const glib.DateTime) c_int;
     pub const equal = g_date_time_equal;
 
@@ -4005,7 +4020,7 @@ pub const IOChannel = extern struct {
     pub const read = g_io_channel_read;
 
     /// Replacement for `glib.IOChannel.read` with the new API.
-    extern fn g_io_channel_read_chars(p_channel: *IOChannel, p_buf: *[*]u8, p_count: usize, p_bytes_read: ?*usize, p_error: ?*?*glib.Error) glib.IOStatus;
+    extern fn g_io_channel_read_chars(p_channel: *IOChannel, p_buf: [*]u8, p_count: usize, p_bytes_read: ?*usize, p_error: ?*?*glib.Error) glib.IOStatus;
     pub const readChars = g_io_channel_read_chars;
 
     /// Reads a line, including the terminating character(s),
@@ -4621,6 +4636,74 @@ pub const KeyFile = opaque {
     extern fn g_key_file_load_from_file(p_key_file: *KeyFile, p_file: [*:0]const u8, p_flags: glib.KeyFileFlags, p_error: ?*?*glib.Error) c_int;
     pub const loadFromFile = g_key_file_load_from_file;
 
+    /// Evaluates and merges configuration key/values from multiple Unix directories into a single key file.
+    ///
+    /// This function reads and merges all available configuration files based on the rules defined by
+    /// the [UAPI Configuration Files Specification](https://github.com/uapi-group/specifications/blob/main/specs/configuration_files_specification.md) (version 1).
+    ///
+    /// This API is primarily intended for system daemons or CLI tools that need to load systemd-style
+    /// configuration files spread across vendor and customization directories. User applications
+    /// should generally use [`GSettings`](../gio/class.Settings.html) instead to manage user preferences.
+    ///
+    /// ### Directory Layout Guidance
+    /// When choosing paths for `etc_subdir` and `usr_subdir`, you should prefer using your build
+    /// system's standard configuration variables (such as `$sysconfdir` and `$libdir`) rather
+    /// than hard-coding absolute paths. For context, on a standard Linux layout, `etc_subdir`
+    /// typically points to administrative overrides (e.g., `/etc`), `run_subdir` to /run while
+    /// `usr_subdir` points to the vendor defaults (e.g., `/usr/lib` or `/usr/share`). Passing `NULL`
+    /// will fall back to platform-specific defaults where appropriate.
+    ///
+    /// ### Relationship to XDG Base Directory Specification
+    /// Note that this function operates independently of the
+    /// [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/)
+    /// and `glib.getSystemConfigDirs`. While XDG directories (like `$XDG_CONFIG_DIRS`)
+    /// are intended to manage desktop session applications and user-facing environments, this
+    /// API is strictly designed for low-level system-wide components following the UAPI
+    /// specification. Mixing the two concepts should be avoided.
+    ///
+    /// Note that this function is synchronous and blocking. Because it may load an arbitrary amount
+    /// of files, it is best suited for application startup or non-interactive environments. If called
+    /// from a user-interactive UI thread, you must handle asynchronicity yourself if needed.
+    ///
+    /// If no file for parsing has been found, `glib.@"KeyFileError.NOT_FOUND"` is returned.
+    /// If files have been found but the OS returns an error when opening or reading a
+    /// file, a `glib.FileError` is returned. If there is a problem parsing
+    /// files, a `glib.KeyFileError` is returned.
+    ///
+    ///
+    /// The following example parses files in following order:
+    ///
+    /// - `<SYSCONFDIR>/project/mydaemon.conf`
+    /// - `/run/project/mydaemon.conf` (if <SYSCONFDIR>/project/mydaemon.conf is not defined)
+    /// - `<LIBDIR>/project/mydaemon.conf`
+    ///   (if `<SYSCONFDIR>/project/mydaemon.conf` and `/run/project/mydaemon.conf are not defined`)
+    /// - valid drop-ins in `<SYSCONFDIR>/project/mydaemon.conf.d/`, `/run/project/mydaemon.conf.d/`, `<LIBDIR>/project/mydaemon.conf.d/`
+    ///
+    /// ```
+    /// g_autoptr(GKeyFile) kf = g_key_file_new ();
+    /// g_autoptr(GError) local_error = NULL;
+    ///
+    /// // Using build-configured paths or defaults instead of hardcoded strings
+    /// gboolean success = g_key_file_load_unix_configurations (kf,
+    ///                                                         "my-daemon",
+    ///                                                         SYSCONFDIR,
+    ///                                                         RUNDIR,
+    ///                                                         LIBDIR,
+    ///                                                         "mydaemon",
+    ///                                                         "conf",
+    ///                                                         G_KEY_FILE_NONE,
+    ///                                                         &local_error);
+    /// if (!success)
+    ///   {
+    ///     g_warning ("Failed to load configuration: `s`", local_error->message);
+    ///     return;
+    ///   }
+    ///
+    /// g_autofree char *val = g_key_file_get_string (kf, "Management", "Setting", NULL);
+    /// ```
+    extern fn g_key_file_load_unix_configurations(p_key_file: *KeyFile, p_project: ?[*:0]const u8, p_etc_subdir: ?[*:0]const u8, p_run_subdir: ?[*:0]const u8, p_usr_subdir: ?[*:0]const u8, p_config_name: [*:0]const u8, p_config_suffix: ?[*:0]const u8, p_flags: glib.KeyFileFlags, p_error: ?*?*glib.Error) c_int;
+    pub const loadUnixConfigurations = g_key_file_load_unix_configurations;
+
     /// Increases the reference count of `key_file`.
     extern fn g_key_file_ref(p_key_file: *KeyFile) *glib.KeyFile;
     pub const ref = g_key_file_ref;
@@ -4829,7 +4912,7 @@ pub const List = extern struct {
     /// number_list = g_list_append (number_list, GINT_TO_POINTER (27));
     /// number_list = g_list_append (number_list, GINT_TO_POINTER (14));
     /// ```
-    extern fn g_list_append(p_list: *glib.List, p_data: ?*anyopaque) *glib.List;
+    extern fn g_list_append(p_list: ?*glib.List, p_data: ?*anyopaque) *glib.List;
     pub const append = g_list_append;
 
     /// Adds the second `glib.List` onto the end of the first `glib.List`.
@@ -4954,11 +5037,11 @@ pub const List = extern struct {
     pub const index = g_list_index;
 
     /// Inserts a new element into the list at the given position.
-    extern fn g_list_insert(p_list: *glib.List, p_data: ?*anyopaque, p_position: c_int) *glib.List;
+    extern fn g_list_insert(p_list: ?*glib.List, p_data: ?*anyopaque, p_position: c_int) *glib.List;
     pub const insert = g_list_insert;
 
     /// Inserts a new element into the list before the given position.
-    extern fn g_list_insert_before(p_list: *glib.List, p_sibling: *glib.List, p_data: ?*anyopaque) *glib.List;
+    extern fn g_list_insert_before(p_list: ?*glib.List, p_sibling: *glib.List, p_data: ?*anyopaque) *glib.List;
     pub const insertBefore = g_list_insert_before;
 
     /// Inserts `link_` into the list before the given position.
@@ -5041,7 +5124,7 @@ pub const List = extern struct {
     ///
     /// Do not use this function to prepend a new element to a different
     /// element than the start of the list. Use `glib.List.insertBefore` instead.
-    extern fn g_list_prepend(p_list: *glib.List, p_data: ?*anyopaque) *glib.List;
+    extern fn g_list_prepend(p_list: ?*glib.List, p_data: ?*anyopaque) *glib.List;
     pub const prepend = g_list_prepend;
 
     extern fn g_list_push_allocator(p_allocator: *glib.Allocator) void;
@@ -5381,7 +5464,7 @@ pub const MainContext = opaque {
     ///
     /// You must have successfully acquired the context with
     /// `glib.MainContext.acquire` before you may call this function.
-    extern fn g_main_context_query(p_context: ?*MainContext, p_max_priority: c_int, p_timeout_: *c_int, p_fds: *[*]glib.PollFD, p_n_fds: c_int) c_int;
+    extern fn g_main_context_query(p_context: ?*MainContext, p_max_priority: c_int, p_timeout_: *c_int, p_fds: [*]glib.PollFD, p_n_fds: c_int) c_int;
     pub const query = g_main_context_query;
 
     /// Increases the reference count on a `glib.MainContext` object by one.
@@ -5639,6 +5722,26 @@ pub const MarkupParseContext = opaque {
     extern fn g_markup_parse_context_free(p_context: *MarkupParseContext) void;
     pub const free = g_markup_parse_context_free;
 
+    /// Retrieves the start and end positions of an attribute assignment
+    /// in a start tag.
+    ///
+    /// This function can be used in the `start_element` callback to
+    /// obtain location information for error reporting.
+    ///
+    /// Calling it outside of the `start_element` callback
+    /// has undefined results.
+    ///
+    /// Note that `line_number` and `char_number` are intended for human
+    /// readable error messages and are therefore 1-based and in Unicode
+    /// characters. `offset` on the other hand is meant for programmatic
+    /// use, and thus is 0-based and in bytes.
+    ///
+    /// The information is meant to accompany the values returned by
+    /// `glib.MarkupParseContext.getPosition`, and comes with the
+    /// same accuracy guarantees.
+    extern fn g_markup_parse_context_get_attribute_position(p_context: *MarkupParseContext, p_attr: c_uint, p_start_lines: ?*usize, p_start_chars: ?*usize, p_start_offset: ?*usize, p_end_lines: ?*usize, p_end_chars: ?*usize, p_end_offset: ?*usize) void;
+    pub const getAttributePosition = g_markup_parse_context_get_attribute_position;
+
     /// Retrieves the name of the currently open element.
     ///
     /// If called from the start_element or end_element handlers this will
@@ -5661,12 +5764,39 @@ pub const MarkupParseContext = opaque {
     extern fn g_markup_parse_context_get_element_stack(p_context: *MarkupParseContext) *const glib.SList;
     pub const getElementStack = g_markup_parse_context_get_element_stack;
 
+    /// Retrieves the current offset from the beginning of the document,
+    /// in bytes.
+    ///
+    /// The information is meant to accompany the values returned by
+    /// `glib.MarkupParseContext.getPosition`, and comes with the
+    /// same accuracy guarantees.
+    extern fn g_markup_parse_context_get_offset(p_context: *MarkupParseContext) usize;
+    pub const getOffset = g_markup_parse_context_get_offset;
+
     /// Retrieves the current line number and the number of the character on
     /// that line. Intended for use in error messages; there are no strict
     /// semantics for what constitutes the "current" line number other than
     /// "the best number we could come up with for error messages."
     extern fn g_markup_parse_context_get_position(p_context: *MarkupParseContext, p_line_number: ?*c_int, p_char_number: ?*c_int) void;
     pub const getPosition = g_markup_parse_context_get_position;
+
+    /// Retrieves the start position of the current start or end tag.
+    ///
+    /// This function can be used in the `start_element` or `end_element`
+    /// callbacks to obtain location information for error reporting.
+    ///
+    /// Calling it outside of these callbacks has undefined results.
+    ///
+    /// Note that `line_number` and `char_number` are intended for human
+    /// readable error messages and are therefore 1-based and in Unicode
+    /// characters. `offset` on the other hand is meant for programmatic
+    /// use, and thus is 0-based and in bytes.
+    ///
+    /// The information is meant to accompany the values returned by
+    /// `glib.MarkupParseContext.getPosition`, and comes with the
+    /// same accuracy guarantees.
+    extern fn g_markup_parse_context_get_tag_start(p_context: *MarkupParseContext, p_line_number: *usize, p_char_number: *usize, p_offset: *usize) void;
+    pub const getTagStart = g_markup_parse_context_get_tag_start;
 
     /// Returns the user_data associated with `context`.
     ///
@@ -5881,8 +6011,8 @@ pub const MarkupParser = extern struct {
     }
 };
 
-/// A GMatchInfo is an opaque struct used to return information about
-/// matches.
+/// An opaque struct used to return information about matches to a
+/// `glib.Regex`.
 pub const MatchInfo = opaque {
     /// Returns a new string containing the text in `string_to_expand` with
     /// references and escape sequences expanded. References refer to the last
@@ -5911,6 +6041,8 @@ pub const MatchInfo = opaque {
     /// If `match_num` is a valid sub pattern but it didn't match anything
     /// (e.g. sub pattern 1, matching "b" against "(a)?b") then an empty
     /// string is returned.
+    /// When a partial match is reported via `glib.MatchInfo.isPartialMatch`
+    /// only the full text of the match can be queried (`match_num` must be `0`).
     ///
     /// If the match was obtained using the DFA algorithm, that is using
     /// `glib.Regex.matchAll` or `glib.Regex.matchAllFull`, the retrieved
@@ -5930,6 +6062,9 @@ pub const MatchInfo = opaque {
     ///
     /// If a sub pattern didn't match anything (e.g. sub pattern 1, matching
     /// "b" against "(a)?b") then an empty string is inserted.
+    ///
+    /// When a partial match is reported via `glib.MatchInfo.isPartialMatch`
+    /// only the full text of the match will be returned, i.e. an array of size 1.
     ///
     /// If the last match was obtained using the DFA algorithm, that is using
     /// `glib.Regex.matchAll` or `glib.Regex.matchAllFull`, the retrieved
@@ -5969,6 +6104,8 @@ pub const MatchInfo = opaque {
     ///
     /// Valid values for `match_num` are `0` for the full text of the match,
     /// `1` for the first paren set, `2` for the second, and so on.
+    /// When a partial match is reported via `glib.MatchInfo.isPartialMatch`
+    /// only the full text of the match can be queried (`match_num` must be `0`).
     ///
     /// As `end_pos` is set to the byte after the final byte of the match (on success),
     /// the length of the match can be calculated as `end_pos - start_pos`.
@@ -6229,6 +6366,10 @@ pub const MatchInfo = opaque {
     ///
     /// There were formerly some restrictions on the pattern for partial matching.
     /// The restrictions no longer apply.
+    ///
+    /// If the match was partial `glib.MatchInfo.fetch`, `glib.MatchInfo.fetchPos`
+    /// and `glib.MatchInfo.fetchAll` can be called to retrieve the text and positions
+    /// of the entire match, i.e. only for sub expression `0`.
     ///
     /// See pcrepartial(3) for more information on partial matching.
     extern fn g_match_info_is_partial_match(p_match_info: *const MatchInfo) c_int;
@@ -8690,7 +8831,7 @@ pub const Regex = opaque {
     /// `string` is not copied and is used in `glib.MatchInfo` internally. If
     /// you use any `glib.MatchInfo` method (except `glib.MatchInfo.free`) after
     /// freeing or modifying `string` then the behaviour is undefined.
-    extern fn g_regex_match_all_full(p_regex: *const Regex, p_string: [*]const u8, p_string_len: isize, p_start_position: c_int, p_match_options: glib.RegexMatchFlags, p_match_info: ?**glib.MatchInfo, p_error: ?*?*glib.Error) c_int;
+    extern fn g_regex_match_all_full(p_regex: *const Regex, p_string: [*:0]const u8, p_string_len: isize, p_start_position: c_int, p_match_options: glib.RegexMatchFlags, p_match_info: ?**glib.MatchInfo, p_error: ?*?*glib.Error) c_int;
     pub const matchAllFull = g_regex_match_all_full;
 
     /// Scans for a match in `string` for the pattern in `regex`.
@@ -8744,7 +8885,7 @@ pub const Regex = opaque {
     ///     }
     /// }
     /// ```
-    extern fn g_regex_match_full(p_regex: *const Regex, p_string: [*]const u8, p_string_len: isize, p_start_position: c_int, p_match_options: glib.RegexMatchFlags, p_match_info: ?**glib.MatchInfo, p_error: ?*?*glib.Error) c_int;
+    extern fn g_regex_match_full(p_regex: *const Regex, p_string: [*:0]const u8, p_string_len: isize, p_start_position: c_int, p_match_options: glib.RegexMatchFlags, p_match_info: ?**glib.MatchInfo, p_error: ?*?*glib.Error) c_int;
     pub const matchFull = g_regex_match_full;
 
     /// Increases reference count of `regex` by 1.
@@ -8762,11 +8903,11 @@ pub const Regex = opaque {
     ///
     /// There are also escapes that changes the case of the following text:
     ///
-    /// - \l: Convert to lower case the next character
-    /// - \u: Convert to upper case the next character
-    /// - \L: Convert to lower case till \E
-    /// - \U: Convert to upper case till \E
-    /// - \E: End case modification
+    /// - `\l`: Convert to lower case the next character
+    /// - `\u`: Convert to upper case the next character
+    /// - `\L`: Convert to lower case until the next `\E`
+    /// - `\U`: Convert to upper case until the next `\E`
+    /// - `\E`: End case modification
     ///
     /// If you do not need to use backreferences use `glib.Regex.replaceLiteral`.
     ///
@@ -8776,8 +8917,8 @@ pub const Regex = opaque {
     ///
     /// Setting `start_position` differs from just passing over a shortened
     /// string and setting `G_REGEX_MATCH_NOTBOL` in the case of a pattern that
-    /// begins with any kind of lookbehind assertion, such as "\b".
-    extern fn g_regex_replace(p_regex: *const Regex, p_string: [*]const u8, p_string_len: isize, p_start_position: c_int, p_replacement: [*:0]const u8, p_match_options: glib.RegexMatchFlags, p_error: ?*?*glib.Error) ?[*:0]u8;
+    /// begins with any kind of lookbehind assertion, such as `"\b"`.
+    extern fn g_regex_replace(p_regex: *const Regex, p_string: [*:0]const u8, p_string_len: isize, p_start_position: c_int, p_replacement: [*:0]const u8, p_match_options: glib.RegexMatchFlags, p_error: ?*?*glib.Error) ?[*:0]u8;
     pub const replace = g_regex_replace;
 
     /// Replaces occurrences of the pattern in regex with the output of
@@ -8825,7 +8966,7 @@ pub const Regex = opaque {
     ///
     /// ...
     /// ```
-    extern fn g_regex_replace_eval(p_regex: *const Regex, p_string: [*]const u8, p_string_len: isize, p_start_position: c_int, p_match_options: glib.RegexMatchFlags, p_eval: glib.RegexEvalCallback, p_user_data: ?*anyopaque, p_error: ?*?*glib.Error) ?[*:0]u8;
+    extern fn g_regex_replace_eval(p_regex: *const Regex, p_string: [*:0]const u8, p_string_len: isize, p_start_position: c_int, p_match_options: glib.RegexMatchFlags, p_eval: glib.RegexEvalCallback, p_user_data: ?*anyopaque, p_error: ?*?*glib.Error) ?[*:0]u8;
     pub const replaceEval = g_regex_replace_eval;
 
     /// Replaces all occurrences of the pattern in `regex` with the
@@ -8836,7 +8977,7 @@ pub const Regex = opaque {
     /// shortened string and setting `G_REGEX_MATCH_NOTBOL` in the
     /// case of a pattern that begins with any kind of lookbehind
     /// assertion, such as "\b".
-    extern fn g_regex_replace_literal(p_regex: *const Regex, p_string: [*]const u8, p_string_len: isize, p_start_position: c_int, p_replacement: [*:0]const u8, p_match_options: glib.RegexMatchFlags, p_error: ?*?*glib.Error) ?[*:0]u8;
+    extern fn g_regex_replace_literal(p_regex: *const Regex, p_string: [*:0]const u8, p_string_len: isize, p_start_position: c_int, p_replacement: [*:0]const u8, p_match_options: glib.RegexMatchFlags, p_error: ?*?*glib.Error) ?[*:0]u8;
     pub const replaceLiteral = g_regex_replace_literal;
 
     /// Breaks the string on the pattern, and returns an array of the tokens.
@@ -8880,7 +9021,7 @@ pub const Regex = opaque {
     /// Setting `start_position` differs from just passing over a shortened
     /// string and setting `G_REGEX_MATCH_NOTBOL` in the case of a pattern
     /// that begins with any kind of lookbehind assertion, such as "\b".
-    extern fn g_regex_split_full(p_regex: *const Regex, p_string: [*]const u8, p_string_len: isize, p_start_position: c_int, p_match_options: glib.RegexMatchFlags, p_max_tokens: c_int, p_error: ?*?*glib.Error) ?[*:null]?[*:0]u8;
+    extern fn g_regex_split_full(p_regex: *const Regex, p_string: [*:0]const u8, p_string_len: isize, p_start_position: c_int, p_match_options: glib.RegexMatchFlags, p_max_tokens: c_int, p_error: ?*?*glib.Error) ?[*:null]?[*:0]u8;
     pub const splitFull = g_regex_split_full;
 
     /// Decreases reference count of `regex` by 1. When reference count drops
@@ -9028,7 +9169,7 @@ pub const SList = extern struct {
     /// number_list = g_slist_append (number_list, GINT_TO_POINTER (27));
     /// number_list = g_slist_append (number_list, GINT_TO_POINTER (14));
     /// ```
-    extern fn g_slist_append(p_list: *glib.SList, p_data: ?*anyopaque) *glib.SList;
+    extern fn g_slist_append(p_list: ?*glib.SList, p_data: ?*anyopaque) *glib.SList;
     pub const append = g_slist_append;
 
     /// Adds the second `glib.SList` onto the end of the first `glib.SList`.
@@ -9146,11 +9287,11 @@ pub const SList = extern struct {
     pub const index = g_slist_index;
 
     /// Inserts a new element into the list at the given position.
-    extern fn g_slist_insert(p_list: *glib.SList, p_data: ?*anyopaque, p_position: c_int) *glib.SList;
+    extern fn g_slist_insert(p_list: ?*glib.SList, p_data: ?*anyopaque, p_position: c_int) *glib.SList;
     pub const insert = g_slist_insert;
 
     /// Inserts a node before `sibling` containing `data`.
-    extern fn g_slist_insert_before(p_slist: *glib.SList, p_sibling: *glib.SList, p_data: ?*anyopaque) *glib.SList;
+    extern fn g_slist_insert_before(p_slist: ?*glib.SList, p_sibling: *glib.SList, p_data: ?*anyopaque) *glib.SList;
     pub const insertBefore = g_slist_insert_before;
 
     /// Inserts a new element into the list, using the given
@@ -9204,7 +9345,7 @@ pub const SList = extern struct {
     /// list = g_slist_prepend (list, "last");
     /// list = g_slist_prepend (list, "first");
     /// ```
-    extern fn g_slist_prepend(p_list: *glib.SList, p_data: ?*anyopaque) *glib.SList;
+    extern fn g_slist_prepend(p_list: ?*glib.SList, p_data: ?*anyopaque) *glib.SList;
     pub const prepend = g_slist_prepend;
 
     extern fn g_slist_push_allocator(p_allocator: *glib.Allocator) void;
@@ -10000,6 +10141,13 @@ pub const Source = extern struct {
     extern fn g_source_attach(p_source: *Source, p_context: ?*glib.MainContext) c_uint;
     pub const attach = g_source_attach;
 
+    /// Unsets any previously set ready time.
+    ///
+    /// If the source does not have a ready time set, this function
+    /// does nothing.
+    extern fn g_source_clear_ready_time(p_source: *Source) void;
+    pub const clearReadyTime = g_source_clear_ready_time;
+
     /// Removes a source from its `glib.MainContext`, if any, and marks it as
     /// destroyed.
     ///
@@ -10089,6 +10237,16 @@ pub const Source = extern struct {
     extern fn g_source_get_ready_time(p_source: *Source) i64;
     pub const getReadyTime = g_source_get_ready_time;
 
+    /// Gets the ‘ready time’ of `source`, as set by
+    /// `glib.Source.setReadyTimeNs`. If no ready time has been set
+    /// or it has been cleared via method`GLib`.Source.clear_ready_time], this
+    /// function returns false.
+    ///
+    /// Any time before or equal to the current monotonic time (including zero)
+    /// is an indication that the source will fire immediately.
+    extern fn g_source_get_ready_time_ns(p_source: *Source, p_ready_time: ?*u64) c_int;
+    pub const getReadyTimeNs = g_source_get_ready_time_ns;
+
     /// Gets the time to be used when checking this source.
     ///
     /// The advantage of
@@ -10100,6 +10258,18 @@ pub const Source = extern struct {
     /// other reasonable alternative otherwise.  See `glib.getMonotonicTime`.
     extern fn g_source_get_time(p_source: *Source) i64;
     pub const getTime = g_source_get_time;
+
+    /// Gets the time to be used when checking this source.
+    ///
+    /// The advantage of calling this function over calling
+    /// `glib.getMonotonicTimeNs` directly is
+    /// that when checking multiple sources, GLib can cache a single value
+    /// instead of having to repeatedly get the system monotonic time.
+    ///
+    /// The time here is the system monotonic time, if available, or some
+    /// other reasonable alternative otherwise.  See `glib.getMonotonicTimeNs`.
+    extern fn g_source_get_time_ns(p_source: *Source) u64;
+    pub const getTimeNs = g_source_get_time_ns;
 
     /// Returns whether `source` has been destroyed.
     ///
@@ -10363,6 +10533,8 @@ pub const Source = extern struct {
     ///
     /// If `ready_time` is `-1` then the source is never woken up on the basis
     /// of the passage of time.
+    /// Since GLib 2.90 `glib.Source.clearReadyTime` should be used
+    /// instead for this purpose.
     ///
     /// Dispatching the source does not reset the ready time.  You should do
     /// so yourself, from the source dispatch function.
@@ -10380,6 +10552,32 @@ pub const Source = extern struct {
     /// Do not call this API on a `glib.Source` that you did not create.
     extern fn g_source_set_ready_time(p_source: *Source, p_ready_time: i64) void;
     pub const setReadyTime = g_source_set_ready_time;
+
+    /// Sets a source to be dispatched when the given monotonic time is
+    /// reached (or passed).
+    ///
+    /// If the monotonic time is in the past (as it
+    /// always will be if `ready_time` is `0`) then the source will be
+    /// dispatched immediately.
+    ///
+    /// Dispatching the source does not reset the ready time.  You should do
+    /// so yourself, from the source dispatch function.
+    ///
+    /// To reset the ready time, use `glib.Source.clearReadyTime`.
+    ///
+    /// Note that if you have a pair of sources where the ready time of one
+    /// suggests that it will be delivered first but the priority for the
+    /// other suggests that it would be delivered first, and the ready time
+    /// for both sources is reached during the same main context iteration,
+    /// then the order of dispatch is undefined.
+    ///
+    /// It is a no-op to call this function on a `glib.Source` which has
+    /// already been destroyed with `glib.Source.destroy`.
+    ///
+    /// This API is only intended to be used by implementations of `glib.Source`.
+    /// Do not call this API on a `glib.Source` that you did not create.
+    extern fn g_source_set_ready_time_ns(p_source: *Source, p_ready_time: u64) void;
+    pub const setReadyTimeNs = g_source_set_ready_time_ns;
 
     /// A variant of `glib.Source.setName` that does not
     /// duplicate the `name`, and can only be used with
@@ -10648,7 +10846,7 @@ pub const StaticPrivate = extern struct {
     }
 };
 
-/// The `glib.StaticRWLock` struct represents a read-write lock. A read-write
+/// The `StaticRWLock` struct represents a read-write lock. A read-write
 /// lock can be used for protecting data that some portions of code only
 /// read from, while others also write. In such situations it is
 /// desirable that several readers can read at once, whereas of course
@@ -10692,8 +10890,8 @@ pub const StaticPrivate = extern struct {
 /// ```
 ///
 /// This example shows an array which can be accessed by many readers
-/// (the `my_array_get` function) simultaneously, whereas the writers
-/// (the `my_array_set` function) will only be allowed once at a time
+/// (the ``my_array_get`` function) simultaneously, whereas the writers
+/// (the ``my_array_set`` function) will only be allowed once at a time
 /// and only if no readers currently access the array. This is because
 /// of the potentially dangerous resizing of the array. Using these
 /// functions is fully multi-thread safe now.
@@ -10705,21 +10903,21 @@ pub const StaticPrivate = extern struct {
 /// to finish their operation. As soon as the last reader unlocks the
 /// data, the writer will lock it.
 ///
-/// Even though `glib.StaticRWLock` is not opaque, it should only be used
+/// Even though `StaticRWLock` is not opaque, it should only be used
 /// with the following functions.
 ///
-/// All of the g_static_rw_lock_* functions can be used even if
-/// `glib.threadInit` has not been called. Then they do nothing, apart
-/// from g_static_rw_lock_*_trylock, which does nothing but returning `TRUE`.
+/// All of the `g_static_rw_lock_*` functions can be used even if
+/// `Thread.init` has not been called. Then they do nothing, apart
+/// from `g_static_rw_lock_*_trylock`, which does nothing but returning true.
 ///
 /// A read-write lock has a higher overhead than a mutex. For example, both
-/// `glib.StaticRWLock.readerLock` and `glib.StaticRWLock.readerUnlock` have
-/// to lock and unlock a `glib.StaticMutex`, so it takes at least twice the time
-/// to lock and unlock a `glib.StaticRWLock` that it does to lock and unlock a
-/// `glib.StaticMutex`. So only data structures that are accessed by multiple
+/// `StaticRWLock.readerLock` and `StaticRWLock.readerUnlock` have
+/// to lock and unlock a `StaticMutex`, so it takes at least twice the time
+/// to lock and unlock a `StaticRWLock` that it does to lock and unlock a
+/// `StaticMutex`. So only data structures that are accessed by multiple
 /// readers, and which keep the lock for a considerable time justify a
-/// `glib.StaticRWLock`. The above example most probably would fare better with a
-/// `glib.StaticMutex`.
+/// `StaticRWLock`. The above example most probably would fare better with a
+/// `StaticMutex`.
 pub const StaticRWLock = extern struct {
     f_mutex: glib.StaticMutex,
     f_read_cond: ?*glib.Cond,
@@ -11022,6 +11220,10 @@ pub const String = extern struct {
     ///
     /// Instead of passing `FALSE` to this function, consider using
     /// `glib.String.freeAndSteal`.
+    ///
+    /// Similarly, instead of passing `TRUE` to this function,
+    /// `glib.String.freeDeep` can be used. In particular, it can be used
+    /// with `glib.clearPointer`.
     extern fn g_string_free(p_string: *String, p_free_segment: c_int) ?[*:0]u8;
     pub const free = g_string_free;
 
@@ -11031,6 +11233,18 @@ pub const String = extern struct {
     /// must free it after use with `glib.free`.
     extern fn g_string_free_and_steal(p_string: *String) [*:0]u8;
     pub const freeAndSteal = g_string_free_and_steal;
+
+    /// Frees the memory allocated for the `glib.String` together with its
+    /// character data.
+    ///
+    /// This is equivalent to calling `g_string_free (string, TRUE)`, but it can
+    /// be used with `glib.clearPointer`:
+    ///
+    /// ```c
+    /// g_clear_pointer (&my_string, g_string_free_deep);
+    /// ```
+    extern fn g_string_free_deep(p_string: *String) void;
+    pub const freeDeep = g_string_free_deep;
 
     /// Transfers ownership of the contents of `string` to a newly allocated
     /// `glib.Bytes`.  The `glib.String` structure itself is deallocated, and it is
@@ -11127,6 +11341,10 @@ pub const String = extern struct {
     /// replacement will be inserted no more than once per possible position
     /// (beginning of string, end of string and between characters). This did
     /// not work correctly in earlier versions.
+    ///
+    /// If `limit` is zero and more than `G_MAXUINT` instances of `find` are in
+    /// the input string, they will all be replaced, but the return value will
+    /// be capped at `G_MAXUINT`.
     extern fn g_string_replace(p_string: *String, p_find: [*:0]const u8, p_replace: [*:0]const u8, p_limit: c_uint) c_uint;
     pub const replace = g_string_replace;
 
@@ -12602,21 +12820,6 @@ pub const Tuples = extern struct {
     /// returned value should not be changed.
     extern fn g_tuples_index(p_tuples: *Tuples, p_index_: c_int, p_field: c_int) ?*anyopaque;
     pub const index = g_tuples_index;
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// A Unix pipe. The advantage of this type over `int[2]` is that it can
-/// be closed automatically when it goes out of scope, using `g_auto(GUnixPipe)`,
-/// on compilers that support that feature.
-pub const UnixPipe = extern struct {
-    /// A pair of file descriptors, each negative if closed or not yet opened.
-    ///  The file descriptor with index `G_UNIX_PIPE_END_READ` is readable.
-    ///  The file descriptor with index `G_UNIX_PIPE_END_WRITE` is writable.
-    f_fds: [2]c_int,
 
     test {
         @setEvalBranchQuota(100_000);
@@ -14181,6 +14384,9 @@ pub const Variant = opaque {
     /// The semantics of this function are exactly the same as
     /// `glib.Variant.getData`, except that the returned `glib.Bytes` holds
     /// a reference to the variant data.
+    ///
+    /// This function cannot fail, even for corrupted variants. In that case
+    /// it will return a `glib.Bytes` filled with nul bytes.
     extern fn g_variant_get_data_as_bytes(p_value: *Variant) *glib.Bytes;
     pub const getDataAsBytes = g_variant_get_data_as_bytes;
 
@@ -14204,6 +14410,7 @@ pub const Variant = opaque {
     /// In particular, arrays of these fixed-sized types can be interpreted
     /// as an array of the given C type, with `element_size` set to the size
     /// the appropriate type:
+    ///
     /// - `G_VARIANT_TYPE_INT16` (etc.): `gint16` (etc.)
     /// - `G_VARIANT_TYPE_BOOLEAN`: `guchar` (not `gboolean`!)
     /// - `G_VARIANT_TYPE_BYTE`: `guint8`
@@ -14490,11 +14697,11 @@ pub const Variant = opaque {
 
     /// Looks up a value in a dictionary `glib.Variant`.
     ///
-    /// This function works with dictionaries of the type a{s*} (and equally
-    /// well with type a{o*}, but we only further discuss the string case
+    /// This function works with dictionaries of the type `a{s*}` (and equally
+    /// well with type `a{o*}`), but we only further discuss the string case
     /// for sake of clarity).
     ///
-    /// In the event that `dictionary` has the type a{sv}, the `expected_type`
+    /// In the event that `dictionary` has the type `a{sv}`, the `expected_type`
     /// string specifies what type of value is expected to be inside of the
     /// variant. If the value inside the variant has a different type then
     /// `NULL` is returned. In the event that `dictionary` has a value type other
@@ -14508,7 +14715,7 @@ pub const Variant = opaque {
     /// value will have this type.
     ///
     /// This function is currently implemented with a linear scan.  If you
-    /// plan to do many lookups then `glib.VariantDict` may be more efficient.
+    /// plan to do many lookups then `VariantDict` may be more efficient.
     extern fn g_variant_lookup_value(p_dictionary: *Variant, p_key: [*:0]const u8, p_expected_type: ?*const glib.VariantType) *glib.Variant;
     pub const lookupValue = g_variant_lookup_value;
 
@@ -16723,6 +16930,7 @@ pub const UnicodeBreakType = enum(c_int) {
     aksara_start = 45,
     virama_final = 46,
     virama = 47,
+    unambiguous_hyphen = 48,
     _,
 
     pub const close_parenthesis = UnicodeBreakType.close_paranthesis;
@@ -16917,6 +17125,10 @@ pub const UnicodeScript = enum(c_int) {
     gurung_khema = 169,
     kirat_rai = 170,
     ol_onal = 171,
+    sidetic = 172,
+    tolong_siki = 173,
+    tai_yo = 174,
+    beria_erfe = 175,
     _,
 
     /// Looks up the Unicode script for `iso15924`.  ISO 15924 assigns four-letter
@@ -16997,18 +17209,6 @@ pub const UnicodeType = enum(c_int) {
     }
 };
 
-/// Mnemonic constants for the ends of a Unix pipe.
-pub const UnixPipeEnd = enum(c_int) {
-    read = 0,
-    write = 1,
-    _,
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
 /// Error codes returned by `glib.Uri` methods.
 pub const UriError = enum(c_int) {
     failed = 0,
@@ -17045,7 +17245,8 @@ pub const UserDirectory = enum(c_int) {
     directory_public_share = 5,
     directory_templates = 6,
     directory_videos = 7,
-    n_directories = 8,
+    directory_projects = 8,
+    n_directories = 9,
     _,
 
     test {
@@ -17309,7 +17510,7 @@ pub const FormatSizeFlags = packed struct(c_uint) {
 pub const HookFlagMask = packed struct(c_uint) {
     active: bool = false,
     in_call: bool = false,
-    _padding2: bool = false,
+    reserved1: bool = false,
     _padding3: bool = false,
     _padding4: bool = false,
     _padding5: bool = false,
@@ -17342,7 +17543,7 @@ pub const HookFlagMask = packed struct(c_uint) {
 
     pub const flags_active: HookFlagMask = @bitCast(@as(c_uint, 1));
     pub const flags_in_call: HookFlagMask = @bitCast(@as(c_uint, 2));
-    pub const flags_mask: HookFlagMask = @bitCast(@as(c_uint, 15));
+    pub const flags_reserved1: HookFlagMask = @bitCast(@as(c_uint, 4));
 
     test {
         @setEvalBranchQuota(100_000);
@@ -17774,10 +17975,10 @@ pub const RegexCompileFlags = packed struct(c_uint) {
     dupnames: bool = false,
     newline_cr: bool = false,
     newline_lf: bool = false,
-    _padding22: bool = false,
-    bsr_anycrlf: bool = false,
+    newline_reserved1: bool = false,
+    _padding23: bool = false,
     _padding24: bool = false,
-    javascript_compat: bool = false,
+    _padding25: bool = false,
     _padding26: bool = false,
     _padding27: bool = false,
     _padding28: bool = false,
@@ -17800,10 +18001,7 @@ pub const RegexCompileFlags = packed struct(c_uint) {
     pub const flags_dupnames: RegexCompileFlags = @bitCast(@as(c_uint, 524288));
     pub const flags_newline_cr: RegexCompileFlags = @bitCast(@as(c_uint, 1048576));
     pub const flags_newline_lf: RegexCompileFlags = @bitCast(@as(c_uint, 2097152));
-    pub const flags_newline_crlf: RegexCompileFlags = @bitCast(@as(c_uint, 3145728));
-    pub const flags_newline_anycrlf: RegexCompileFlags = @bitCast(@as(c_uint, 5242880));
-    pub const flags_bsr_anycrlf: RegexCompileFlags = @bitCast(@as(c_uint, 8388608));
-    pub const flags_javascript_compat: RegexCompileFlags = @bitCast(@as(c_uint, 33554432));
+    pub const flags_newline_reserved1: RegexCompileFlags = @bitCast(@as(c_uint, 4194304));
 
     test {
         @setEvalBranchQuota(100_000);
@@ -17933,7 +18131,7 @@ pub const TestSubprocessFlags = packed struct(c_uint) {
     inherit_stdin: bool = false,
     inherit_stdout: bool = false,
     inherit_stderr: bool = false,
-    _padding3: bool = false,
+    inherit_descriptors: bool = false,
     _padding4: bool = false,
     _padding5: bool = false,
     _padding6: bool = false,
@@ -17967,6 +18165,7 @@ pub const TestSubprocessFlags = packed struct(c_uint) {
     pub const flags_inherit_stdin: TestSubprocessFlags = @bitCast(@as(c_uint, 1));
     pub const flags_inherit_stdout: TestSubprocessFlags = @bitCast(@as(c_uint, 2));
     pub const flags_inherit_stderr: TestSubprocessFlags = @bitCast(@as(c_uint, 4));
+    pub const flags_inherit_descriptors: TestSubprocessFlags = @bitCast(@as(c_uint, 8));
 
     test {
         @setEvalBranchQuota(100_000);
@@ -18416,8 +18615,10 @@ pub const asciiStrncasecmp = g_ascii_strncasecmp;
 ///
 /// If the correct value would cause overflow, plus or minus `HUGE_VAL`
 /// is returned (according to the sign of the value), and `ERANGE` is
-/// stored in `errno`. If the correct value would cause underflow,
-/// zero is returned and `ERANGE` is stored in `errno`.
+/// stored in `errno`. If the correct value would cause underflow, a value
+/// whose magnitude is no greater than the smallest normalised positive number
+/// is returned; whether `ERANGE` is set is implementation-defined (it may
+/// not be set for gradual underflow where a subnormal value is returned).
 ///
 /// This function resets `errno` before calling ``strtod`` so that
 /// you can reliably detect overflow and underflow.
@@ -18663,7 +18864,7 @@ pub const atomicIntExchangeAndAdd = g_atomic_int_exchange_and_add;
 /// Gets the current value of `atomic`.
 ///
 /// This call acts as a full compiler and hardware
-/// memory barrier (before the get).
+/// memory barrier.
 ///
 /// While `atomic` has a `volatile` qualifier, this is a historical artifact and
 /// the pointer passed to it should not be `volatile`.
@@ -18697,7 +18898,7 @@ pub const atomicIntOr = g_atomic_int_or;
 /// Sets the value of `atomic` to `newval`.
 ///
 /// This call acts as a full compiler and hardware
-/// memory barrier (after the set).
+/// memory barrier.
 ///
 /// While `atomic` has a `volatile` qualifier, this is a historical artifact and
 /// the pointer passed to it should not be `volatile`.
@@ -18794,7 +18995,7 @@ pub const atomicPointerExchange = g_atomic_pointer_exchange;
 /// Gets the current value of `atomic`.
 ///
 /// This call acts as a full compiler and hardware
-/// memory barrier (before the get).
+/// memory barrier.
 ///
 /// While `atomic` has a `volatile` qualifier, this is a historical artifact and
 /// the pointer passed to it should not be `volatile`.
@@ -18821,7 +19022,7 @@ pub const atomicPointerOr = g_atomic_pointer_or;
 /// Sets the value of `atomic` to `newval`.
 ///
 /// This call acts as a full compiler and hardware
-/// memory barrier (after the set).
+/// memory barrier.
 ///
 /// While `atomic` has a `volatile` qualifier, this is a historical artifact and
 /// the pointer passed to it should not be `volatile`.
@@ -18942,7 +19143,7 @@ pub const base64DecodeInplace = g_base64_decode_inplace;
 /// be written to it. Since base64 encodes 3 bytes in 4 chars you need
 /// at least: (`len` / 4) * 3 + 3 bytes (+ 3 may be needed in case of non-zero
 /// state).
-extern fn g_base64_decode_step(p_in: [*]const u8, p_len: usize, p_out: *[*]u8, p_state: *c_int, p_save: *c_uint) usize;
+extern fn g_base64_decode_step(p_in: [*]const u8, p_len: usize, p_out: [*]u8, p_state: *c_int, p_save: *c_uint) usize;
 pub const base64DecodeStep = g_base64_decode_step;
 
 /// Encode a sequence of binary data into its Base-64 stringified
@@ -19395,24 +19596,6 @@ pub const clearSlist = g_clear_slist;
 extern fn g_close(p_fd: c_int, p_error: ?*?*glib.Error) c_int;
 pub const close = g_close;
 
-/// Close every file descriptor equal to or greater than `lowfd`.
-///
-/// Typically `lowfd` will be 3, to leave standard input, standard output
-/// and standard error open.
-///
-/// This is the same as Linux `close_range (lowfd, ~0U, 0)`,
-/// but portable to other OSs and to older versions of Linux.
-/// Equivalently, it is the same as BSD `closefrom (lowfd)`, but portable,
-/// and async-signal-safe on all OSs.
-///
-/// This function is async-signal safe, making it safe to call from a
-/// signal handler or a `glib.SpawnChildSetupFunc`, as long as `lowfd` is
-/// non-negative.
-/// See [`signal(7)`](man:signal(7)) and
-/// [`signal-safety(7)`](man:signal-safety(7)) for more details.
-extern fn g_closefrom(p_lowfd: c_int) c_int;
-pub const closefrom = g_closefrom;
-
 /// Computes the checksum for a binary `data`. This is a
 /// convenience wrapper for `glib.Checksum.new`, `glib.Checksum.getString`
 /// and `glib.Checksum.free`.
@@ -19807,23 +19990,6 @@ pub const environSetenv = g_environ_setenv;
 /// environment `envp`.
 extern fn g_environ_unsetenv(p_envp: ?[*:null]?[*:0]u8, p_variable: [*:0]const u8) [*:null]?[*:0]u8;
 pub const environUnsetenv = g_environ_unsetenv;
-
-/// Mark every file descriptor equal to or greater than `lowfd` to be closed
-/// at the next ``execve`` or similar, as if via the `FD_CLOEXEC` flag.
-///
-/// Typically `lowfd` will be 3, to leave standard input, standard output
-/// and standard error open after exec.
-///
-/// This is the same as Linux `close_range (lowfd, ~0U, CLOSE_RANGE_CLOEXEC)`,
-/// but portable to other OSs and to older versions of Linux.
-///
-/// This function is async-signal safe, making it safe to call from a
-/// signal handler or a `glib.SpawnChildSetupFunc`, as long as `lowfd` is
-/// non-negative.
-/// See [`signal(7)`](man:signal(7)) and
-/// [`signal-safety(7)`](man:signal-safety(7)) for more details.
-extern fn g_fdwalk_set_cloexec(p_lowfd: c_int) c_int;
-pub const fdwalkSetCloexec = g_fdwalk_set_cloexec;
 
 /// Gets a `glib.FileError` constant based on the passed-in `err_no`.
 ///
@@ -20448,7 +20614,7 @@ pub const getLanguageNamesWithCategory = g_get_language_names_with_category;
 extern fn g_get_locale_variants(p_locale: [*:0]const u8) [*:null]?[*:0]u8;
 pub const getLocaleVariants = g_get_locale_variants;
 
-/// Queries the system monotonic time.
+/// Queries the system monotonic time in microseconds.
 ///
 /// The monotonic clock will always increase and doesn’t suffer
 /// discontinuities when the user (or NTP) changes the system time.  It
@@ -20459,13 +20625,38 @@ pub const getLocaleVariants = g_get_locale_variants;
 /// the passage of time as measured by system calls such as
 /// [``poll``](man:poll(2)) but it
 /// may not always be possible to do this.
+///
+/// A more accurate version of this function exists.
+/// `glib.getMonotonicTimeNs` returns the time in nanoseconds.
 extern fn g_get_monotonic_time() i64;
 pub const getMonotonicTime = g_get_monotonic_time;
+
+/// Queries the system monotonic time in nanoseconds.
+///
+/// The monotonic clock will always increase and doesn’t suffer
+/// discontinuities when the user (or NTP) changes the system time.  It
+/// may or may not continue to tick during times where the machine is
+/// suspended.
+///
+/// We try to use the clock that corresponds as closely as possible to
+/// the passage of time as measured by system calls such as
+/// [``poll``](man:poll(2)) but it
+/// may not always be possible to do this.
+///
+/// Another version of this function exists.
+/// `glib.getMonotonicTime` returns the time in microseconds.
+/// If you want to support older GLib versions, it is an alternative.
+extern fn g_get_monotonic_time_ns() u64;
+pub const getMonotonicTimeNs = g_get_monotonic_time_ns;
 
 /// Determine the approximate number of threads that the system will
 /// schedule simultaneously for this process.  This is intended to be
 /// used as a parameter to `glib.ThreadPool.new` for CPU bound tasks and
 /// similar cases.
+///
+/// On platforms where enough information is known, this will be the number of
+/// high performance cores and will not include low power ‘efficiency’ cores.
+/// Use platform specific APIs to query for low power cores if needed.
 extern fn g_get_num_processors() c_uint;
 pub const getNumProcessors = g_get_num_processors;
 
@@ -21185,7 +21376,7 @@ pub const logSetHandlerFull = g_log_set_handler_full;
 /// log messages are formatted and outputted.
 ///
 /// There can only be one writer function. It is an error to set more than one.
-extern fn g_log_set_writer_func(p_func: ?glib.LogWriterFunc, p_user_data: ?*anyopaque, p_user_data_free: ?glib.DestroyNotify) void;
+extern fn g_log_set_writer_func(p_func: glib.LogWriterFunc, p_user_data: ?*anyopaque, p_user_data_free: ?glib.DestroyNotify) void;
 pub const logSetWriterFunc = g_log_set_writer_func;
 
 /// Log a message with structured data.
@@ -22197,7 +22388,7 @@ pub const propagateError = g_propagate_error;
 /// If `dest` is `NULL`, free `src`; otherwise, moves `src` into `*dest`.
 /// `*dest` must be `NULL`. After the move, add a prefix as with
 /// `glib.prefixError`.
-extern fn g_propagate_prefixed_error(p_dest: **glib.Error, p_src: *glib.Error, p_format: [*:0]const u8, ...) void;
+extern fn g_propagate_prefixed_error(p_dest: ?**glib.Error, p_src: *glib.Error, p_format: [*:0]const u8, ...) void;
 pub const propagatePrefixedError = g_propagate_prefixed_error;
 
 /// This is just like the standard C [``qsort``](man:qsort(3)) function, but
@@ -22587,6 +22778,9 @@ pub const shellErrorQuark = g_shell_error_quark;
 /// guaranteed that `argvp` will be a non-empty array if this function returns
 /// successfully.
 ///
+/// When constructing `command_line`, quote any filenames or potentially
+/// untrusted input using `glib.shellQuote`.
+///
 /// Free the returned vector with `glib.strfreev`.
 extern fn g_shell_parse_argv(p_command_line: [*:0]const u8, p_argcp: ?*c_int, p_argvp: ?*[*:null]?[*:0]u8, p_error: ?*?*glib.Error) c_int;
 pub const shellParseArgv = g_shell_parse_argv;
@@ -22594,8 +22788,11 @@ pub const shellParseArgv = g_shell_parse_argv;
 /// Quotes a string so that the shell (/bin/sh) will interpret the
 /// quoted string to mean `unquoted_string`.
 ///
-/// If you pass a filename to the shell, for example, you should first
-/// quote it with this function.
+/// If you pass a filename or other untrusted input to `glib.shellParseArgv`,
+/// you should first quote it with this function. This is sufficient to ensure
+/// untrusted input cannot ‘break out’ of the quotes. Beware: this only works
+/// because `glib.shellParseArgv` is not a real Unix shell. Quoting untrusted
+/// input is not an adequate security mechanism when using a real shell.
 ///
 /// The return value must be freed with `glib.free`.
 ///
@@ -22727,6 +22924,21 @@ pub const snprintf = g_snprintf;
 /// (like [``qsort_r``](man:qsort_r(3))).
 ///
 /// Unlike ``qsort``, this is guaranteed to be a stable sort.
+///
+/// An example of sorting an array of strings (a strv):
+/// ```
+/// static int
+/// strcmp_data (const void *a,
+///              const void *b,
+///              void       *user_data)
+/// {
+///   return strcmp (*((const char * const *) a), *((const char * const *) b));
+/// }
+///
+/// char **my_strv = …;
+/// size_t my_strv_length = g_strv_length (my_strv);
+/// g_sort_array (my_strv, (my_strv_length, sizeof (*my_strv), strcmp_data, NULL);
+/// ```
 extern fn g_sort_array(p_array: [*]*anyopaque, p_n_elements: usize, p_element_size: usize, p_compare_func: glib.CompareDataFunc, p_user_data: ?*anyopaque) void;
 pub const sortArray = g_sort_array;
 
@@ -23031,6 +23243,9 @@ pub const spawnClosePid = g_spawn_close_pid;
 /// A simple version of `glib.spawnAsync` that parses a command line with
 /// `glib.shellParseArgv` and passes it to `glib.spawnAsync`.
 ///
+/// Filenames and potentially untrusted input in `command_line` should be quoted
+/// using `glib.shellQuote`.
+///
 /// Runs a command line in the background. Unlike `glib.spawnAsync`, the
 /// `G_SPAWN_SEARCH_PATH` flag is enabled, other flags are not. Note
 /// that `G_SPAWN_SEARCH_PATH` can have security implications, so
@@ -23047,6 +23262,8 @@ pub const spawnCommandLineAsync = g_spawn_command_line_async;
 /// See `glib.spawnSync` for full details.
 ///
 /// The `command_line` argument will be parsed by `glib.shellParseArgv`.
+/// Filenames and potentially untrusted input should be quoted using
+/// `glib.shellQuote`.
 ///
 /// Unlike `glib.spawnSync`, the `G_SPAWN_SEARCH_PATH` flag is enabled.
 /// Note that `G_SPAWN_SEARCH_PATH` can have security implications, so
@@ -23316,7 +23533,7 @@ pub const strcmp0 = g_strcmp0;
 /// - `\r` → [U+000D Carriage Return](https://en.wikipedia.org/wiki/Carriage_return)
 /// - `\t` → [U+0009 Horizontal Tabulation](https://en.wikipedia.org/wiki/Tab_character)
 /// - `\v` → [U+000B Vertical Tabulation](https://en.wikipedia.org/wiki/Vertical_Tab)
-/// - `\` followed by one to three octal digits → the numeric value (mod 255)
+/// - `\` followed by one to three octal digits → the numeric value (mod 256)
 /// - `\` followed by any other character → the character as is.
 ///   For example, `\\` will turn into a backslash (`\`) and `\"` into a double quote (`"`).
 ///
@@ -23568,18 +23785,21 @@ pub const strsignal = g_strsignal;
 extern fn g_strsplit(p_string: [*:0]const u8, p_delimiter: [*:0]const u8, p_max_tokens: c_int) [*:null]?[*:0]u8;
 pub const strsplit = g_strsplit;
 
-/// Splits `string` into a number of tokens not containing any of the characters
-/// in `delimiters`. A token is the (possibly empty) longest string that does not
-/// contain any of the characters in `delimiters`. If `max_tokens` is reached, the
-/// remainder is appended to the last token.
+/// Splits `string` into a number of tokens not containing any of the
+/// bytes in `delimiters`.
 ///
-/// For example, the result of g_strsplit_set ("abc:def/ghi", ":/", -1) is an
-/// array containing the three strings "abc", "def", and "ghi".
+/// A token is the (possibly empty) longest string that does not
+/// contain any of the bytes in `delimiters`. Note that separators
+/// will only be single bytes from `delimiters`. If `max_tokens` is reached,
+/// the remainder is appended to the last token.
 ///
-/// The result of g_strsplit_set (":def/ghi:", ":/", -1) is an array containing
-/// the four strings "", "def", "ghi", and "".
+/// For example, the result of `g_strsplit_set ("abc:def/ghi", ":/", -1)`
+/// is an array containing the three strings `"abc"`, `"def"`, and `"ghi"`.
 ///
-/// As a special case, the result of splitting the empty string "" is an empty
+/// The result of `g_strsplit_set (":def/ghi:/x", ":/", -1)` is an array
+/// containing the five strings `""`, `"def"`, `"ghi"`, `""`, `"x"`.
+///
+/// As a special case, the result of splitting the empty string `""` is an empty
 /// array, not an array containing a single string. The reason for this
 /// special case is that being able to represent an empty array is typically
 /// more useful than consistent handling of empty elements. If you do need
@@ -23588,7 +23808,7 @@ pub const strsplit = g_strsplit;
 ///
 /// Note that this function works on bytes not characters, so it can't be used
 /// to delimit UTF-8 strings for anything but ASCII characters.
-extern fn g_strsplit_set(p_string: [*:0]const u8, p_delimiters: [*:0]const u8, p_max_tokens: c_int) [*:null]?[*:0]u8;
+extern fn g_strsplit_set(p_string: [*:0]const u8, p_delimiters: [*]const u8, p_max_tokens: c_int) [*:null]?[*:0]u8;
 pub const strsplitSet = g_strsplit_set;
 
 /// Searches the string `haystack` for the first occurrence
@@ -23733,7 +23953,7 @@ pub const testBugBase = g_test_bug_base;
 ///
 /// The data file should either have been distributed with the module
 /// containing the test (`glib.@"TestFileType.dist"` or built as part of the
-/// buildcsystem of that module (`glib.@"TestFileType.built"`).
+/// build system of that module (`glib.@"TestFileType.built"`).
 ///
 /// In order for this function to work in srcdir != builddir situations,
 /// the `G_TEST_SRCDIR` and `G_TEST_BUILDDIR` environment variables need
@@ -24250,6 +24470,10 @@ extern fn g_test_trap_has_passed() c_int;
 pub const testTrapHasPassed = g_test_trap_has_passed;
 
 /// Checks the result of the last `glib.testTrapSubprocess` call.
+extern fn g_test_trap_has_skipped() c_int;
+pub const testTrapHasSkipped = g_test_trap_has_skipped;
+
+/// Checks the result of the last `glib.testTrapSubprocess` call.
 extern fn g_test_trap_reached_timeout() c_int;
 pub const testTrapReachedTimeout = g_test_trap_reached_timeout;
 
@@ -24514,6 +24738,17 @@ pub const timeoutAddSecondsOnce = g_timeout_add_seconds_once;
 /// time.  See `glib.getMonotonicTime`.
 extern fn g_timeout_source_new(p_interval: c_uint) *glib.Source;
 pub const timeoutSourceNew = g_timeout_source_new;
+
+/// Creates a new timeout source.
+///
+/// The source will not initially be associated with any `glib.MainContext`
+/// and must be added to one with `glib.Source.attach` before it will be
+/// executed.
+///
+/// The interval given is in terms of monotonic time, not wall clock
+/// time.  See `glib.getMonotonicTimeNs`.
+extern fn g_timeout_source_new_ns(p_interval: u64) *glib.Source;
+pub const timeoutSourceNewNs = g_timeout_source_new_ns;
 
 /// Creates a new timeout source.
 ///
@@ -24849,124 +25084,6 @@ pub const unicodeCanonicalDecomposition = g_unicode_canonical_decomposition;
 /// manual for more information.
 extern fn g_unicode_canonical_ordering(p_string: [*]u32, p_len: usize) void;
 pub const unicodeCanonicalOrdering = g_unicode_canonical_ordering;
-
-extern fn g_unix_error_quark() glib.Quark;
-pub const unixErrorQuark = g_unix_error_quark;
-
-/// Sets a function to be called when the IO condition, as specified by
-/// `condition` becomes true for `fd`.
-///
-/// `function` will be called when the specified IO condition becomes
-/// `TRUE`.  The function is expected to clear whatever event caused the
-/// IO condition to become true and return `TRUE` in order to be notified
-/// when it happens again.  If `function` returns `FALSE` then the watch
-/// will be cancelled.
-///
-/// The return value of this function can be passed to `glib.sourceRemove`
-/// to cancel the watch at any time that it exists.
-///
-/// The source will never close the fd -- you must do it yourself.
-extern fn g_unix_fd_add(p_fd: c_int, p_condition: glib.IOCondition, p_function: glib.UnixFDSourceFunc, p_user_data: ?*anyopaque) c_uint;
-pub const unixFdAdd = g_unix_fd_add;
-
-/// Sets a function to be called when the IO condition, as specified by
-/// `condition` becomes true for `fd`.
-///
-/// This is the same as `glib.unixFdAdd`, except that it allows you to
-/// specify a non-default priority and a provide a `glib.DestroyNotify` for
-/// `user_data`.
-extern fn g_unix_fd_add_full(p_priority: c_int, p_fd: c_int, p_condition: glib.IOCondition, p_function: glib.UnixFDSourceFunc, p_user_data: ?*anyopaque, p_notify: ?glib.DestroyNotify) c_uint;
-pub const unixFdAddFull = g_unix_fd_add_full;
-
-/// Creates a `glib.Source` to watch for a particular I/O condition on a file
-/// descriptor.
-///
-/// The source will never close the `fd` — you must do it yourself.
-///
-/// Any callback attached to the returned `glib.Source` must have type
-/// `glib.UnixFDSourceFunc`.
-extern fn g_unix_fd_source_new(p_fd: c_int, p_condition: glib.IOCondition) *glib.Source;
-pub const unixFdSourceNew = g_unix_fd_source_new;
-
-/// Get the `passwd` file entry for the given `user_name` using ``getpwnam_r``.
-/// This can fail if the given `user_name` doesn’t exist.
-///
-/// The returned `struct passwd` has been allocated using `glib.malloc` and should
-/// be freed using `glib.free`. The strings referenced by the returned struct are
-/// included in the same allocation, so are valid until the `struct passwd` is
-/// freed.
-///
-/// This function is safe to call from multiple threads concurrently.
-///
-/// You will need to include `pwd.h` to get the definition of `struct passwd`.
-extern fn g_unix_get_passwd_entry(p_user_name: [*:0]const u8, p_error: ?*?*glib.Error) ?*anyopaque;
-pub const unixGetPasswdEntry = g_unix_get_passwd_entry;
-
-/// Similar to the UNIX `pipe` call, but on modern systems like Linux
-/// uses the `pipe2` system call, which atomically creates a pipe with
-/// the configured flags.
-///
-/// As of GLib 2.78, the supported flags are `O_CLOEXEC`/`FD_CLOEXEC` (see below)
-/// and `O_NONBLOCK`. Prior to GLib 2.78, only `FD_CLOEXEC` was supported — if
-/// you wanted to configure `O_NONBLOCK` then that had to be done separately with
-/// ``fcntl``.
-///
-/// Since GLib 2.80, the constants `G_UNIX_PIPE_END_READ` and
-/// `G_UNIX_PIPE_END_WRITE` can be used as mnemonic indexes in `fds`.
-///
-/// It is a programmer error to call this function with unsupported flags, and a
-/// critical warning will be raised.
-///
-/// As of GLib 2.78, it is preferred to pass `O_CLOEXEC` in, rather than
-/// `FD_CLOEXEC`, as that matches the underlying ``pipe`` API more closely. Prior
-/// to 2.78, only `FD_CLOEXEC` was supported. Support for `FD_CLOEXEC` may be
-/// deprecated and removed in future.
-extern fn g_unix_open_pipe(p_fds: *[2]c_int, p_flags: c_int, p_error: ?*?*glib.Error) c_int;
-pub const unixOpenPipe = g_unix_open_pipe;
-
-/// Control the non-blocking state of the given file descriptor,
-/// according to `nonblock`. On most systems this uses `O_NONBLOCK`, but
-/// on some older ones may use `O_NDELAY`.
-extern fn g_unix_set_fd_nonblocking(p_fd: c_int, p_nonblock: c_int, p_error: ?*?*glib.Error) c_int;
-pub const unixSetFdNonblocking = g_unix_set_fd_nonblocking;
-
-/// A convenience function for `glib.unixSignalSourceNew`, which
-/// attaches to the default `glib.MainContext`.  You can remove the watch
-/// using `glib.sourceRemove`.
-extern fn g_unix_signal_add(p_signum: c_int, p_handler: glib.SourceFunc, p_user_data: ?*anyopaque) c_uint;
-pub const unixSignalAdd = g_unix_signal_add;
-
-/// A convenience function for `glib.unixSignalSourceNew`, which
-/// attaches to the default `glib.MainContext`.  You can remove the watch
-/// using `glib.sourceRemove`.
-extern fn g_unix_signal_add_full(p_priority: c_int, p_signum: c_int, p_handler: glib.SourceFunc, p_user_data: ?*anyopaque, p_notify: ?glib.DestroyNotify) c_uint;
-pub const unixSignalAddFull = g_unix_signal_add_full;
-
-/// Create a `glib.Source` that will be dispatched upon delivery of the UNIX
-/// signal `signum`.  In GLib versions before 2.36, only `SIGHUP`, `SIGINT`,
-/// `SIGTERM` can be monitored.  In GLib 2.36, `SIGUSR1` and `SIGUSR2`
-/// were added. In GLib 2.54, `SIGWINCH` was added.
-///
-/// Note that unlike the UNIX default, all sources which have created a
-/// watch will be dispatched, regardless of which underlying thread
-/// invoked `glib.unixSignalSourceNew`.
-///
-/// For example, an effective use of this function is to handle `SIGTERM`
-/// cleanly; flushing any outstanding files, and then calling
-/// `glib.MainLoop.quit`.  It is not safe to do any of this from a regular
-/// UNIX signal handler; such a handler may be invoked while `malloc` or
-/// another library function is running, causing reentrancy issues if the
-/// handler attempts to use those functions.  None of the GLib/GObject
-/// API is safe against this kind of reentrancy.
-///
-/// The interaction of this source when combined with native UNIX
-/// functions like `sigprocmask` is not defined.
-///
-/// The source will not initially be associated with any `glib.MainContext`
-/// and must be added to one with `glib.Source.attach` before it will be
-/// executed.
-extern fn g_unix_signal_source_new(p_signum: c_int) *glib.Source;
-pub const unixSignalSourceNew = g_unix_signal_source_new;
 
 /// A wrapper for the POSIX `unlink` function. The `unlink` function
 /// deletes a name from the filesystem. If this was the last link to the
@@ -25568,15 +25685,16 @@ pub const HFunc = *const fn (p_key: ?*anyopaque, p_value: ?*anyopaque, p_user_da
 pub const HRFunc = *const fn (p_key: ?*anyopaque, p_value: ?*anyopaque, p_user_data: ?*anyopaque) callconv(.c) c_int;
 
 /// Specifies the type of the hash function which is passed to
-/// `glib.HashTable.new` when a `glib.HashTable` is created.
+/// `HashTable.new` when a `HashTable` is created.
 ///
-/// The function is passed a key and should return a `guint` hash value.
-/// The functions `glib.directHash`, `glib.intHash` and `glib.strHash` provide
-/// hash functions which can be used when the key is a `gpointer`, `gint`*,
-/// and `gchar`* respectively.
+/// The function is passed a key and should return an `unsigned int` hash value.
+/// The functions `directHash`, `intHash` and `strHash` provide
+/// hash functions which can be used when the key is a `void*`, `int*`,
+/// and `char*` respectively.
 ///
-/// `glib.directHash` is also the appropriate hash function for keys
-/// of the form `GINT_TO_POINTER (n)` (or similar macros).
+/// `directHash` is also the appropriate hash function for keys
+/// of the form [`GINT_TO_POINTER (n)`](conversion-macros.html`gint`-to-pointer)
+/// (or similar macros).
 ///
 /// A good hash functions should produce
 /// hash values that are evenly distributed over a fairly large range.
@@ -25587,9 +25705,9 @@ pub const HRFunc = *const fn (p_key: ?*anyopaque, p_value: ?*anyopaque, p_user_d
 /// Note that the hash functions provided by GLib have these qualities,
 /// but are not particularly robust against manufactured keys that
 /// cause hash collisions. Therefore, you should consider choosing
-/// a more secure hash function when using a GHashTable with keys
+/// a more secure hash function when using a `HashTable` with keys
 /// that originate in untrusted data (such as HTTP requests).
-/// Using `glib.strHash` in that situation might make your application
+/// Using `strHash` in that situation might make your application
 /// vulnerable to
 /// [Algorithmic Complexity Attacks](https://lwn.net/Articles/474912/).
 ///
@@ -25612,7 +25730,7 @@ pub const HookCompareFunc = *const fn (p_new_hook: *glib.Hook, p_sibling: *glib.
 
 /// Defines the type of function to be called when a hook in a
 /// list of hooks gets finalized.
-pub const HookFinalizeFunc = *const fn (p_hook_list: *anyopaque, p_hook: *glib.Hook) callconv(.c) void;
+pub const HookFinalizeFunc = *const fn (p_hook_list: *glib.HookList, p_hook: *glib.Hook) callconv(.c) void;
 
 /// Defines the type of the function passed to `glib.Hook.find`.
 pub const HookFindFunc = *const fn (p_hook: *glib.Hook, p_data: ?*anyopaque) callconv(.c) c_int;
@@ -25693,14 +25811,18 @@ pub const PollFunc = *const fn (p_ufds: *glib.PollFD, p_nfsd: c_uint, p_timeout_
 /// These are called with the complete formatted string to output.
 pub const PrintFunc = *const fn (p_string: [*:0]const u8) callconv(.c) void;
 
-/// Specifies the type of the function passed to `glib.Regex.replaceEval`.
+/// A callback passed to `glib.Regex.replaceEval`.
+///
 /// It is called for each occurrence of the pattern in the string passed
 /// to `glib.Regex.replaceEval`, and it should append the replacement to
 /// `result`.
+///
+/// Use `glib.MatchInfo.getRegex` and `glib.MatchInfo.getString`
+/// if you need the regex object itself, or the matched string.
 pub const RegexEvalCallback = *const fn (p_match_info: *const glib.MatchInfo, p_result: *glib.String, p_user_data: ?*anyopaque) callconv(.c) c_int;
 
 /// Specifies the type of the message handler function.
-pub const ScannerMsgFunc = *const fn (p_scanner: *anyopaque, p_message: [*:0]u8, p_error: c_int) callconv(.c) void;
+pub const ScannerMsgFunc = *const fn (p_scanner: *glib.Scanner, p_message: [*:0]u8, p_error: c_int) callconv(.c) void;
 
 /// A `glib.SequenceIterCompareFunc` is a function used to compare iterators.
 /// It must return zero if the iterators compare equal, a negative value
@@ -25852,10 +25974,6 @@ pub const TraverseFunc = *const fn (p_key: ?*anyopaque, p_value: ?*anyopaque, p_
 /// `glib.Tree.foreachNode`. If the function returns `TRUE`, the traversal is
 /// stopped.
 pub const TraverseNodeFunc = *const fn (p_node: *glib.TreeNode, p_data: ?*anyopaque) callconv(.c) c_int;
-
-/// The type of functions to be called when a UNIX fd watch source
-/// triggers.
-pub const UnixFDSourceFunc = *const fn (p_fd: c_int, p_condition: glib.IOCondition, p_user_data: ?*anyopaque) callconv(.c) c_int;
 
 /// Declares a type of function which takes no arguments
 /// and has no return value. It is used to specify the type
@@ -26142,7 +26260,7 @@ pub const MAXUINT8 = 255;
 /// Like `gtk_micro_version`, but from the headers used at
 /// application compile time, rather than from the library
 /// linked against at application run time.
-pub const MICRO_VERSION = 0;
+pub const MICRO_VERSION = 1;
 /// The minimum value which can be held in a `gint16`.
 pub const MININT16 = -32768;
 /// The minimum value which can be held in a `gint32`.
@@ -26156,8 +26274,11 @@ pub const MININT8 = -128;
 /// Like `gtk_minor_version`, but from the headers used at
 /// application compile time, rather than from the library
 /// linked against at application run time.
-pub const MINOR_VERSION = 86;
+pub const MINOR_VERSION = 90;
 pub const MODULE_SUFFIX = "so";
+/// Number of nanoseconds in one second (1 billion).
+/// This macro is provided for code readability.
+pub const NSEC_PER_SEC = 1000000000;
 /// If a long option in the main group has this name, it is not treated as a
 /// regular option. Instead it collects all non-option arguments which would
 /// otherwise be left in `argv`. The option must be of type

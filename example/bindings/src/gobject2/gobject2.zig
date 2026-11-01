@@ -123,7 +123,7 @@ pub const Binding = opaque {
         /// The name of the property of `gobject.Binding.properties.source` that should be used
         /// as the source of the binding.
         ///
-        /// This should be in [canonical form][canonical-parameter-names] to get the
+        /// This should be in [canonical form]`gobject.@"ParamSpec#parameter-names"` to get the
         /// best performance.
         pub const source_property = struct {
             pub const name = "source-property";
@@ -141,7 +141,7 @@ pub const Binding = opaque {
         /// The name of the property of `gobject.Binding.properties.target` that should be used
         /// as the target of the binding.
         ///
-        /// This should be in [canonical form][canonical-parameter-names] to get the
+        /// This should be in [canonical form]`gobject.@"ParamSpec#parameter-names"` to get the
         /// best performance.
         pub const target_property = struct {
             pub const name = "target-property";
@@ -374,7 +374,7 @@ pub const InitiallyUnowned = extern struct {
 /// methods for all object types in GTK, Pango and other libraries
 /// based on GObject. The `GObject` class provides methods for object
 /// construction and destruction, property access methods, and signal
-/// support. Signals are described in detail [here][gobject-Signals].
+/// support. Signals are described in detail [here](signals.html).
 ///
 /// For a tutorial on implementing a new `GObject` class, see [How to define and
 /// implement a new GObject](tutorial.html`how`-to-define-and-implement-a-new-gobject).
@@ -831,7 +831,7 @@ pub const Object = extern struct {
     pub const dupQdata = g_object_dup_qdata;
 
     /// This function is intended for `gobject.Object` implementations to re-enforce
-    /// a [floating][floating-ref] object reference. Doing this is seldom
+    /// a [floating](floating-refs.html) object reference. Doing this is seldom
     /// required: all `GInitiallyUnowneds` are created with a floating reference
     /// which usually just needs to be sunken by calling `gobject.Object.refSink`.
     extern fn g_object_force_floating(p_object: *Object) void;
@@ -923,7 +923,7 @@ pub const Object = extern struct {
     extern fn g_object_getv(p_object: *Object, p_n_properties: c_uint, p_names: [*][*:0]const u8, p_values: [*]gobject.Value) void;
     pub const getv = g_object_getv;
 
-    /// Checks whether `object` has a [floating][floating-ref] reference.
+    /// Checks whether `object` has a [floating](floating-refs.html) reference.
     extern fn g_object_is_floating(p_object: *Object) c_int;
     pub const isFloating = g_object_is_floating;
 
@@ -990,7 +990,7 @@ pub const Object = extern struct {
     pub const ref = g_object_ref;
 
     /// Increase the reference count of `object`, and possibly remove the
-    /// [floating][floating-ref] reference, if `object` has a floating reference.
+    /// [floating](floating-refs.html) reference, if `object` has a floating reference.
     ///
     /// In other words, if the object is floating, then this call "assumes
     /// ownership" of the floating reference, converting it to a normal
@@ -2930,31 +2930,31 @@ pub const CClosure = extern struct {
 ///
 /// It will generally comprise a function of some kind and a marshaller
 /// used to call it. It is the responsibility of the marshaller to
-/// convert the arguments for the invocation from `GValues` into
+/// convert the arguments for the invocation from [GValues]`Value` into
 /// a suitable form, perform the callback on the converted arguments,
-/// and transform the return value back into a `gobject.Value`.
+/// and transform the return value back into a `Value`.
 ///
 /// In the case of C programs, a closure usually just holds a pointer
 /// to a function and maybe a data argument, and the marshaller
-/// converts between `gobject.Value` and native C types. The GObject
-/// library provides the `gobject.CClosure` type for this purpose. Bindings for
-/// other languages need marshallers which convert between `GValues`
+/// converts between `Value` and native C types. The GObject
+/// library provides the `CClosure` type for this purpose. Bindings for
+/// other languages need marshallers which convert between [GValues]`Value`
 /// and suitable representations in the runtime of the language in
 /// order to use functions written in that language as callbacks. Use
-/// `gobject.Closure.setMarshal` to set the marshaller on such a custom
+/// `Closure.setMarshal` to set the marshaller on such a custom
 /// closure implementation.
 ///
 /// Within GObject, closures play an important role in the
 /// implementation of signals. When a signal is registered, the
-/// `c_marshaller` argument to `gobject.signalNew` specifies the default C
+/// `c_marshaller` argument to `signalNew` specifies the default C
 /// marshaller for any closure which is connected to this
 /// signal. GObject provides a number of C marshallers for this
-/// purpose, see the g_cclosure_marshal_*() functions. Additional C
+/// purpose, see the `g_cclosure_marshal_*()` functions. Additional C
 /// marshallers can be generated with the [glib-genmarshal][glib-genmarshal]
 /// utility.  Closures can be explicitly connected to signals with
-/// `gobject.signalConnectClosure`, but it usually more convenient to let
+/// `signalConnectClosure`, but it usually more convenient to let
 /// GObject create a closure automatically by using one of the
-/// g_signal_connect_*() functions which take a callback function/user
+/// `g_signal_connect_*()` functions which take a callback function/user
 /// data pair.
 ///
 /// Using closures has a number of important advantages over a simple
@@ -2964,11 +2964,11 @@ pub const CClosure = extern struct {
 ///   which means that language bindings don't have to write individual glue
 ///   for each callback type.
 ///
-/// - The reference counting of `gobject.Closure` makes it easy to handle reentrancy
+/// - The reference counting of `Closure` makes it easy to handle reentrancy
 ///   right; if a callback is removed while it is being invoked, the closure
 ///   and its parameters won't be freed until the invocation finishes.
 ///
-/// - `gobject.Closure.invalidate` and invalidation notifiers allow callbacks to be
+/// - `Closure.invalidate` and invalidation notifiers allow callbacks to be
 ///   automatically removed when the objects they point to go away.
 pub const Closure = extern struct {
     bitfields0: packed struct(c_uint) {
@@ -3227,7 +3227,7 @@ pub const EnumClass = extern struct {
     f_n_values: c_uint,
     /// an array of `gobject.EnumValue` structs describing the
     ///  individual values.
-    f_values: ?*gobject.EnumValue,
+    f_values: ?[*]gobject.EnumValue,
 
     test {
         @setEvalBranchQuota(100_000);
@@ -3262,7 +3262,7 @@ pub const FlagsClass = extern struct {
     f_n_values: c_uint,
     /// an array of `gobject.FlagsValue` structs describing the
     ///  individual values.
-    f_values: ?*gobject.FlagsValue,
+    f_values: ?[*]gobject.FlagsValue,
 
     test {
         @setEvalBranchQuota(100_000);
@@ -4327,7 +4327,7 @@ pub const Value = extern struct {
     pub const getVariant = g_value_get_variant;
 
     /// Initializes `value` to store values of the given `type`, and sets its value
-    /// to the default for `type`.
+    /// to the initial value for `type`.
     ///
     /// This must be called before any other methods on a `gobject.Value`, so
     /// the value knows what type it’s meant to store.
@@ -4363,7 +4363,7 @@ pub const Value = extern struct {
     extern fn g_value_peek_pointer(p_value: *const Value) ?*anyopaque;
     pub const peekPointer = g_value_peek_pointer;
 
-    /// Clears the current value in `value` and resets it to the default value
+    /// Clears the current value in `value` and resets it to the initial value
     /// (as if the value had just been initialized using
     /// `gobject.Value.init`).
     extern fn g_value_reset(p_value: *Value) *gobject.Value;
@@ -5877,7 +5877,7 @@ pub const signalListIds = g_signal_list_ids;
 /// Also tries the ancestors of the given type.
 ///
 /// The type class passed as `itype` must already have been instantiated (for
-/// example, using `gobject.TypeClass.ref`) for this function to work, as signals are
+/// example, using `gobject.typeClassRef`) for this function to work, as signals are
 /// always installed during class initialization.
 ///
 /// See `gobject.signalNew` for details on allowed signal names.
@@ -6184,15 +6184,18 @@ pub const typeDepth = g_type_depth;
 /// Ensures that the indicated `type` has been registered with the
 /// type system, and its `_class_init` method has been run.
 ///
-/// In theory, simply calling the type's `_get_type` method (or using
-/// the corresponding macro) is supposed take care of this. However,
-/// `_get_type` methods are often marked `G_GNUC_CONST` for performance
-/// reasons, even though this is technically incorrect (since
-/// `G_GNUC_CONST` requires that the function not have side effects,
-/// which `_get_type` methods do on the first call). As a result, if
-/// you write a bare call to a `_get_type` macro, it may get optimized
-/// out by the compiler. Using `gobject.typeEnsure` guarantees that the
-/// type's `_get_type` method is called.
+/// Typically, calling the type’s ``_get_type`` method (or using the
+/// corresponding macro) will take care of this. In situations where a
+/// type is looked up dynamically, however, you may need to explicitly call
+/// ``gobject.typeEnsure`` to ensure expected types are registered before the
+/// first lookup. This can happen when using custom widgets from a GTK
+/// `.ui` file, for example.
+///
+/// Historically, ``_get_type`` methods have sometimes been marked as
+/// [`G_GNUC_CONST`](macros.html`compiler`). This is incorrect, as the
+/// first call to a ``_get_type`` method has side-effects. These
+/// annotations should be removed, as they can cause code to be optimized
+/// out in unexpected ways by the compiler.
 extern fn g_type_ensure(p_type: usize) void;
 pub const typeEnsure = g_type_ensure;
 
@@ -6514,7 +6517,7 @@ pub const ClassFinalizeFunc = *const fn (p_g_class: *gobject.TypeClass, p_class_
 ///
 /// Initialization of TypeBClass will first cause initialization of
 /// TypeAClass (derived classes reference their parent classes, see
-/// `gobject.TypeClass.ref` on this).
+/// `gobject.typeClassRef` on this).
 ///
 /// Initialization of TypeAClass roughly involves zero-initializing its fields,
 /// then calling its `gobject.BaseInitFunc` `type_a_base_class_init` to allocate
@@ -6543,7 +6546,7 @@ pub const ClosureMarshal = *const fn (p_closure: *gobject.Closure, p_return_valu
 
 /// The type used for the various notification callbacks which can be registered
 /// on closures.
-pub const ClosureNotify = *const fn (p_data: ?*anyopaque, p_closure: *anyopaque) callconv(.c) void;
+pub const ClosureNotify = *const fn (p_data: ?*anyopaque, p_closure: *gobject.Closure) callconv(.c) void;
 
 /// A callback function used by the type system to initialize a new
 /// instance of a type.
@@ -6612,7 +6615,7 @@ pub const ToggleNotify = *const fn (p_data: ?*anyopaque, p_object: *gobject.Obje
 /// A callback function which is called when the reference count of a class
 /// drops to zero.
 ///
-/// It may use `gobject.TypeClass.ref` to prevent the class from being freed. You
+/// It may use `gobject.typeClassRef` to prevent the class from being freed. You
 /// should not call `gobject.TypeClass.unref` from a `gobject.TypeClassCacheFunc` function
 /// to prevent infinite recursion, use `gobject.TypeClass.unrefUncached` instead.
 ///

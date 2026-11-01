@@ -22,8 +22,8 @@ const Arg = struct {
 };
 const Method = struct {
     name: []const u8,
-    in_args: std.StringArrayHashMap(Arg),
-    out_args: std.StringArrayHashMap(Arg),
+    in_args: std.array_hash_map.String(Arg),
+    out_args: std.array_hash_map.String(Arg),
     //annotations: anyopaque, TODO
 };
 pub const Access = enum { read, write, readwrite };
@@ -72,8 +72,8 @@ pub fn newFromNode(gpa: std.mem.Allocator, node: *xml.Node) !*Interface {
     for (node.childrens.items) |child| {
         const child_name = child.attributes.getEntry("name").?.value_ptr.*;
         if (std.mem.eql(u8, child.name, "method")) {
-            var in_args = std.StringArrayHashMap(Arg).init(allocator);
-            var out_args = std.StringArrayHashMap(Arg).init(allocator);
+            var in_args: std.array_hash_map.String(Arg) = .empty;
+            var out_args: std.array_hash_map.String(Arg) = .empty;
             std.debug.print("{s}(", .{child_name});
             for (child.childrens.items) |arg| {
                 const name = arg.attributes.getEntry("name").?.value_ptr.*;
@@ -84,13 +84,13 @@ pub fn newFromNode(gpa: std.mem.Allocator, node: *xml.Node) !*Interface {
 
                 if (std.mem.eql(u8, "in", direction)) {
                     std.debug.print("{s}: {s}, ", .{ name, zig_type });
-                    try in_args.put(name, .{
+                    try in_args.put(allocator, name, .{
                         .signature = signature,
                         .zig_type = zig_type,
                     });
                 }
                 if (std.mem.eql(u8, "out", direction)) {
-                    try out_args.put(name, .{
+                    try out_args.put(allocator, name, .{
                         .signature = signature,
                         .zig_type = zig_type,
                     });

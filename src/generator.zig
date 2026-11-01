@@ -5,14 +5,28 @@ const Interface = translator.Interface;
 const Property = translator.Property;
 const Access = translator.Access;
 
-pub fn start(allocator: std.mem.Allocator, interface: *Interface, output_dir: []const u8) !void {
-    try std.fs.cwd().makePath(output_dir);
+fn BuildTupleFromArray(comptime size: usize) type {
+    const Element = [0]u8;
+    const types_array: [size]type = @splat(Element);
+    return @Tuple(&types_array);
+}
+
+fn tuplify(comptime size: usize) BuildTupleFromArray(size) {
+    var a: BuildTupleFromArray(size) = undefined;
+    inline for (0..size) |i| {
+        a[i] = .{};
+    }
+    return a;
+}
+
+pub fn start(allocator: std.mem.Allocator, io: std.Io, interface: *Interface, output_dir: []const u8) !void {
+    try std.Io.Dir.cwd().createDirPath(io, output_dir);
     const out_path = try std.mem.concat(allocator, u8, &.{ output_dir, "/", interface.name, ".zig" });
     defer allocator.free(out_path);
-    var out_file = try std.fs.cwd().createFile(out_path, .{});
-    defer out_file.close();
+    var out_file = try std.Io.Dir.cwd().createFile(io, out_path, .{});
+    defer out_file.close(io);
     var buffer: [4096]u8 = undefined;
-    var file_writer = out_file.writer(&buffer);
+    var file_writer = out_file.writer(io, &buffer);
     const writer = &file_writer.interface;
 
     try writeIncludes(writer);
@@ -23,7 +37,7 @@ pub fn start(allocator: std.mem.Allocator, interface: *Interface, output_dir: []
     try writer.flush();
 }
 
-fn writeIncludes(writer: *std.io.Writer) !void {
+fn writeIncludes(writer: *std.Io.Writer) !void {
     _ = try writer.write(
         \\const glib = @import("glib");
         \\const gobject = @import("gobject");
@@ -32,7 +46,7 @@ fn writeIncludes(writer: *std.io.Writer) !void {
     );
 }
 
-fn writeDBusInfo(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeDBusInfo(writer: *std.Io.Writer, interface: *Interface) !void {
     try writer.print(
         \\
         \\pub var dbus_info = gio.DBusInterfaceInfo{{
@@ -71,7 +85,7 @@ fn writeDBusInfo(writer: *std.io.Writer, interface: *Interface) !void {
             \\{s:12}}}),
             \\{s:12}.f_out_args = @constCast(&[_:null]?*gio.DBusArgInfo{{
             \\
-        , .{""} ** 2);
+        , tuplify(2));
 
         var out_iter = method.out_args.iterator();
         while (out_iter.next()) |entry| {
@@ -185,7 +199,7 @@ fn writeDBusInfo(writer: *std.io.Writer, interface: *Interface) !void {
     );
 }
 
-fn writeSkeleton(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeSkeleton(writer: *std.Io.Writer, interface: *Interface) !void {
     _ = try writer.write(
         \\pub const Skeleton = extern struct {
         \\    parent_instance: Parent,
@@ -201,7 +215,7 @@ fn writeSkeleton(writer: *std.io.Writer, interface: *Interface) !void {
         \\        .f_get_property = &getProperty,
         \\        .f_method_call = &methodCall,
         \\        .f_set_property = null,
-        \\        .f_padding = .{@as(*anyopaque, "")} ** 8,
+        \\        .f_padding = @as([8]*anyopaque, @splat("")),
         \\    };
         \\
     );
@@ -372,7 +386,7 @@ fn printType(isSkeleton: bool) []const u8 {
     if (isSkeleton) return "Skeleton" else return "Proxy";
 }
 
-fn writePrivate(writer: *std.io.Writer, interface: *Interface) !void {
+fn writePrivate(writer: *std.Io.Writer, interface: *Interface) !void {
     _ = try writer.write(
         \\    const Private = struct {
         \\
@@ -393,7 +407,7 @@ fn writePrivate(writer: *std.io.Writer, interface: *Interface) !void {
     );
 }
 
-fn writeMethods(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeMethods(writer: *std.Io.Writer, interface: *Interface) !void {
     for (interface.methods.items) |method| {
         try writer.print("    {s}: ?*const fn (interface: *Skeleton, invocation: ?*gio.DBusMethodInvocation, ", .{method.name});
         var iter = method.in_args.iterator();
@@ -411,7 +425,7 @@ fn writeMethods(writer: *std.io.Writer, interface: *Interface) !void {
     _ = try writer.write("\n");
 }
 
-fn writeProperties(writer: *std.io.Writer, interface: *Interface, is_skeleton: bool) !void {
+fn writeProperties(writer: *std.Io.Writer, interface: *Interface, is_skeleton: bool) !void {
     for (interface.properties.items) |property| {
         try writer.print("    {s}: {s}{s},\n", .{
             property.nick,
@@ -422,7 +436,7 @@ fn writeProperties(writer: *std.io.Writer, interface: *Interface, is_skeleton: b
     _ = try writer.write("\n");
 }
 
-fn writeMethodCall(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeMethodCall(writer: *std.Io.Writer, interface: *Interface) !void {
     _ = try writer.write(
         \\
         \\    fn methodCall(_: *gio.DBusConnection, _: ?[*:0]const u8, _: [*:0]const u8, _: ?[*:0]const u8, _: [*:0]const u8, p_parameters: *glib.Variant, p_invocation: *gio.DBusMethodInvocation, p_user_data: ?*anyopaque) callconv(.c) void {
@@ -460,7 +474,7 @@ fn writeMethodCall(writer: *std.io.Writer, interface: *Interface) !void {
     );
 }
 
-fn writeGetProperty(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeGetProperty(writer: *std.Io.Writer, interface: *Interface) !void {
     _ = try writer.write(
         \\
         \\    fn getProperty(_: *gio.DBusConnection, _: ?[*:0]const u8, _: [*:0]const u8, _: ?[*:0]const u8, p_property_name: [*:0]const u8, p_error: **glib.Error, p_user_data: ?*anyopaque) callconv(.c) ?*glib.Variant {
@@ -500,7 +514,7 @@ fn writeGetProperty(writer: *std.io.Writer, interface: *Interface) !void {
     );
 }
 
-fn writeSignals(writer: *std.io.Writer, interface: *Interface, isSkeleton: bool) !void {
+fn writeSignals(writer: *std.Io.Writer, interface: *Interface, isSkeleton: bool) !void {
     _ = try writer.write("    pub const signals = struct {\n");
 
     for (interface.signals.items) |signal| {
@@ -525,7 +539,7 @@ fn writeSignals(writer: *std.io.Writer, interface: *Interface, isSkeleton: bool)
     _ = try writer.write("    };\n\n");
 }
 
-fn writeClass(writer: *std.io.Writer, interface: *Interface, isSkeleton: bool) !void {
+fn writeClass(writer: *std.Io.Writer, interface: *Interface, isSkeleton: bool) !void {
     _ = try writer.print(
         \\    pub const Class = extern struct {{
         \\        parent_class: Parent.Class,
@@ -558,7 +572,7 @@ fn writeClass(writer: *std.io.Writer, interface: *Interface, isSkeleton: bool) !
             \\{s:12}gio.DBusProxy.virtual_methods.g_properties_changed.implement(class, onPropertyChanged);
             \\{s:12}gio.DBusProxy.virtual_methods.g_signal.implement(class, onSignal);
             \\
-        , .{""} ** 2);
+        , tuplify(2));
     }
     _ = try writer.write("            gobject.Object.virtual_methods.finalize.implement(class, finalize);\n");
 
@@ -586,7 +600,7 @@ fn getVariantFunctionByType(zig_type: []const u8, duplicate: bool) []const u8 {
     }
 }
 
-fn printFreeFunction(writer: *std.io.Writer, property: *const Property, spaces: u8) !void {
+fn printFreeFunction(writer: *std.Io.Writer, property: *const Property, spaces: u8) !void {
     if (std.mem.eql(u8, property.zig_type, "*glib.Variant")) {
         _ = try writer.splatByte(' ', spaces);
         try writer.print("if (proxy.{s}) |prop| prop.unref();\n", .{property.nick});
@@ -599,7 +613,7 @@ fn printFreeFunction(writer: *std.io.Writer, property: *const Property, spaces: 
     }
 }
 
-fn writeVirtualMethods(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeVirtualMethods(writer: *std.Io.Writer, interface: *Interface) !void {
     for (interface.methods.items) |method| {
         try writer.print("    pub fn {s}(interface: *Proxy{s}", .{
             method.name,
@@ -607,7 +621,7 @@ fn writeVirtualMethods(writer: *std.io.Writer, interface: *Interface) !void {
         });
         var iter = method.in_args.iterator();
         var idx: u8 = 1;
-        var signatures = [_]u8{0} ** 128;
+        var signatures: [128]u8 = @splat(0);
         var sig_idx: usize = 0;
         while (iter.next()) |arg| {
             try writer.print("{s}: {s}{s}", .{
@@ -648,7 +662,7 @@ fn writeVirtualMethods(writer: *std.io.Writer, interface: *Interface) !void {
     }
 }
 
-fn writeFinalize(writer: *std.io.Writer, interface: *Interface, isSkeleton: bool) !void {
+fn writeFinalize(writer: *std.Io.Writer, interface: *Interface, isSkeleton: bool) !void {
     try writer.print("    fn finalize({s}: *{s}) callconv(.c) void {{\n", .{
         if (isSkeleton) "interface" else "proxy",
         if (isSkeleton) "Skeleton" else "Proxy",
@@ -673,14 +687,14 @@ fn writeFinalize(writer: *std.io.Writer, interface: *Interface, isSkeleton: bool
     , .{if (isSkeleton) "interface" else "proxy"});
 }
 
-fn writeDBusSignals(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeDBusSignals(writer: *std.Io.Writer, interface: *Interface) !void {
     try writer.print(
         \\
         \\{s:4}fn onPropertyChanged(proxy: *Proxy, p_changed_properties: *glib.Variant, _: *const [*:0]const u8) callconv(.c) void {{
         \\{s:8}updateProperties(proxy, p_changed_properties);
         \\{s:4}}}
         \\
-    , .{""} ** 3);
+    , tuplify(3));
 
     try writer.print(
         \\
@@ -710,7 +724,7 @@ fn writeDBusSignals(writer: *std.io.Writer, interface: *Interface) !void {
         \\{s:8}}}
         \\
         \\{s:8}const info = getInfo().lookupSignal(p_signal_name);
-    , .{""} ** 22);
+    , tuplify(22));
 
     for (interface.signals.items, 0..) |signal, idx| {
         if (idx == 0) {
@@ -741,11 +755,11 @@ fn writeDBusSignals(writer: *std.io.Writer, interface: *Interface) !void {
         \\{s:8}for (0..max) |idx| {{
         \\{s:12}params[idx].unref();
         \\{s:8}}}
-    , .{""} ** 3);
+    , tuplify(3));
     try writer.print("\n    }}\n", .{});
 }
 
-fn writeUpdateProperties(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeUpdateProperties(writer: *std.Io.Writer, interface: *Interface) !void {
     _ = try writer.write(
         \\
         \\    fn updateProperties(proxy: *Proxy, v_properties: *glib.Variant) void {
@@ -794,7 +808,7 @@ fn writeUpdateProperties(writer: *std.io.Writer, interface: *Interface) !void {
     try writer.print("{s:4}}}\n", .{""});
 }
 
-fn writeProxy(writer: *std.io.Writer, interface: *Interface) !void {
+fn writeProxy(writer: *std.Io.Writer, interface: *Interface) !void {
     _ = try writer.write(
         \\pub const Proxy = extern struct {
         \\    parent_instance: Parent,

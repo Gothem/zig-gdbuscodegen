@@ -1065,6 +1065,7 @@ pub const Application = extern struct {
     ///
     /// It is important to use the proper GVariant format when retrieving
     /// the options with `glib.VariantDict.lookup`:
+    ///
     /// - for `G_OPTION_ARG_NONE`, use `b`
     /// - for `G_OPTION_ARG_STRING`, use `&s`
     /// - for `G_OPTION_ARG_INT`, use `i`
@@ -1336,7 +1337,7 @@ pub const Application = extern struct {
     /// and override `local_command_line`. In this case, you most likely want
     /// to return `TRUE` from your `local_command_line` implementation to
     /// suppress the default handling. See
-    /// [gapplication-example-cmdline2.c][https://gitlab.gnome.org/GNOME/glib/-/blob/HEAD/gio/tests/gapplication-example-cmdline2.c]
+    /// [gapplication-example-cmdline2.c](https://gitlab.gnome.org/GNOME/glib/-/blob/HEAD/gio/tests/gapplication-example-cmdline2.c)
     /// for an example.
     ///
     /// If, after the above is done, the use count of the application is zero
@@ -2222,8 +2223,8 @@ pub const BufferedInputStream = extern struct {
     extern fn g_buffered_input_stream_get_buffer_size(p_stream: *BufferedInputStream) usize;
     pub const getBufferSize = g_buffered_input_stream_get_buffer_size;
 
-    /// Peeks in the buffer, copying data of size `count` into `buffer`,
-    /// offset `offset` bytes.
+    /// Peeks in the buffered input, copying `count` bytes of data from `offset` bytes
+    /// in the buffered input into `buffer`.
     extern fn g_buffered_input_stream_peek(p_stream: *BufferedInputStream, p_buffer: [*]u8, p_offset: usize, p_count: usize) usize;
     pub const peek = g_buffered_input_stream_peek;
 
@@ -2576,7 +2577,7 @@ pub const Cancellable = extern struct {
     ///  - `gio.Cancellable.reset`
     ///  - `gio.Cancellable.makePollfd`
     ///  - `gio.Cancellable.releaseFd`
-    extern fn g_cancellable_connect(p_cancellable: ?*Cancellable, p_callback: gobject.Callback, p_data: ?*anyopaque, p_data_destroy_func: ?glib.DestroyNotify) c_ulong;
+    extern fn g_cancellable_connect(p_cancellable: *Cancellable, p_callback: gobject.Callback, p_data: ?*anyopaque, p_data_destroy_func: ?glib.DestroyNotify) c_ulong;
     pub const connect = g_cancellable_connect;
 
     /// Disconnects a handler from a cancellable instance similar to
@@ -2644,7 +2645,7 @@ pub const Cancellable = extern struct {
 
     /// Pops `cancellable` off the cancellable stack (verifying that `cancellable`
     /// is on the top of the stack).
-    extern fn g_cancellable_pop_current(p_cancellable: ?*Cancellable) void;
+    extern fn g_cancellable_pop_current(p_cancellable: *Cancellable) void;
     pub const popCurrent = g_cancellable_pop_current;
 
     /// Pushes `cancellable` onto the cancellable stack. The current
@@ -2655,7 +2656,7 @@ pub const Cancellable = extern struct {
     ///
     /// This is typically called automatically by e.g. `gio.File` operations,
     /// so you rarely have to call this yourself.
-    extern fn g_cancellable_push_current(p_cancellable: ?*Cancellable) void;
+    extern fn g_cancellable_push_current(p_cancellable: *Cancellable) void;
     pub const pushCurrent = g_cancellable_push_current;
 
     /// Releases a resources previously allocated by `gio.Cancellable.getFd`
@@ -2691,7 +2692,7 @@ pub const Cancellable = extern struct {
     /// running, this call will block until the handler has finished.
     /// Calling this function from a signal handler will therefore result in a
     /// deadlock.
-    extern fn g_cancellable_reset(p_cancellable: ?*Cancellable) void;
+    extern fn g_cancellable_reset(p_cancellable: *Cancellable) void;
     pub const reset = g_cancellable_reset;
 
     /// If the `cancellable` is cancelled, sets the error to notify
@@ -2976,6 +2977,10 @@ pub const Credentials = opaque {
     /// This operation can fail if `gio.Credentials` is not supported on the
     /// OS or if the native credentials type does not contain information
     /// about the UNIX user.
+    ///
+    /// As the signedness of `uid_t` is not specified by POSIX, it is recommended to
+    /// check `error` for failure rather than trying to check the return value,
+    /// particularly in language bindings.
     extern fn g_credentials_get_unix_user(p_credentials: *Credentials, p_error: ?*?*glib.Error) std.posix.uid_t;
     pub const getUnixUser = g_credentials_get_unix_user;
 
@@ -3038,9 +3043,7 @@ pub const Credentials = opaque {
 pub const DBusActionGroup = opaque {
     pub const Parent = gobject.Object;
     pub const Implements = [_]type{ gio.ActionGroup, gio.RemoteActionGroup };
-    pub const Class = opaque {
-        pub const Instance = DBusActionGroup;
-    };
+    pub const Class = gio.DBusActionGroupClass;
     pub const virtual_methods = struct {};
 
     pub const properties = struct {};
@@ -4270,6 +4273,17 @@ pub const DBusInterfaceSkeleton = extern struct {
                 gobject.ext.as(DBusInterfaceSkeleton.Class, p_class).f_get_vtable = @ptrCast(p_implementation);
             }
         };
+
+        /// Dispatches a method invocation. (Since: 2.88)
+        pub const method_dispatch = struct {
+            pub fn call(p_class: anytype, p_interface_: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_method_call_func: gio.DBusInterfaceMethodCallFunc, p_invocation: *gio.DBusMethodInvocation, p_flags: gio.DBusInterfaceSkeletonFlags, p_object: *gio.DBusObject) void {
+                return gobject.ext.as(DBusInterfaceSkeleton.Class, p_class).f_method_dispatch.?(gobject.ext.as(DBusInterfaceSkeleton, p_interface_), p_method_call_func, p_invocation, p_flags, p_object);
+            }
+
+            pub fn implement(p_class: anytype, p_implementation: *const fn (p_interface_: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_method_call_func: gio.DBusInterfaceMethodCallFunc, p_invocation: *gio.DBusMethodInvocation, p_flags: gio.DBusInterfaceSkeletonFlags, p_object: *gio.DBusObject) callconv(.c) void) void {
+                gobject.ext.as(DBusInterfaceSkeleton.Class, p_class).f_method_dispatch = @ptrCast(p_implementation);
+            }
+        };
     };
 
     pub const properties = struct {
@@ -4491,35 +4505,49 @@ pub const DBusMessage = opaque {
 
     /// Utility function to calculate how many bytes are needed to
     /// completely deserialize the D-Bus message stored at `blob`.
+    ///
+    /// An error will be returned if `blob` contains invalid data, or if not enough
+    /// data is available to determine the size.
     extern fn g_dbus_message_bytes_needed(p_blob: [*]u8, p_blob_len: usize, p_error: ?*?*glib.Error) isize;
     pub const bytesNeeded = g_dbus_message_bytes_needed;
 
-    /// Creates a new empty `gio.DBusMessage`.
+    /// Creates a new empty D-Bus message.
     extern fn g_dbus_message_new() *gio.DBusMessage;
     pub const new = g_dbus_message_new;
 
-    /// Creates a new `gio.DBusMessage` from the data stored at `blob`. The byte
-    /// order that the message was in can be retrieved using
+    /// Creates a new D-Bus message from the data stored at `blob`.
+    ///
+    /// You must have previously called `gio.DBusMessage.bytesNeeded` on `blob`,
+    /// and ensure that `blob` is at least as long as the return value from that
+    /// function indicates. In particular, that means that `blob` must be at least 16
+    /// bytes long (but will typically be much longer).
+    ///
+    /// The byte order that the message was in can be retrieved using
     /// `gio.DBusMessage.getByteOrder`.
     ///
     /// If the `blob` cannot be parsed, contains invalid fields, or contains invalid
-    /// headers, `G_IO_ERROR_INVALID_ARGUMENT` will be returned.
+    /// headers, `gio.@"IOErrorEnum.INVALID_ARGUMENT"` will be returned.
     extern fn g_dbus_message_new_from_blob(p_blob: [*]u8, p_blob_len: usize, p_capabilities: gio.DBusCapabilityFlags, p_error: ?*?*glib.Error) ?*gio.DBusMessage;
     pub const newFromBlob = g_dbus_message_new_from_blob;
 
-    /// Creates a new `gio.DBusMessage` for a method call.
+    /// Creates a new D-Bus message for a method call.
     extern fn g_dbus_message_new_method_call(p_name: ?[*:0]const u8, p_path: [*:0]const u8, p_interface_: ?[*:0]const u8, p_method: [*:0]const u8) *gio.DBusMessage;
     pub const newMethodCall = g_dbus_message_new_method_call;
 
-    /// Creates a new `gio.DBusMessage` for a signal emission.
+    /// Creates a new D-Bus message that is an error reply to `method_call_message`.
+    extern fn g_dbus_message_new_method_error(p_method_call_message: *gio.DBusMessage, p_error_name: [*:0]const u8, p_error_message_format: [*:0]const u8, ...) *gio.DBusMessage;
+    pub const newMethodError = g_dbus_message_new_method_error;
+
+    /// Creates a new D-Bus message for a signal emission.
     extern fn g_dbus_message_new_signal(p_path: [*:0]const u8, p_interface_: [*:0]const u8, p_signal: [*:0]const u8) *gio.DBusMessage;
     pub const newSignal = g_dbus_message_new_signal;
 
-    /// Copies `message`. The copy is a deep copy and the returned
-    /// `gio.DBusMessage` is completely identical except that it is guaranteed
-    /// to not be locked.
+    /// Copies `message` with a deep copy.
     ///
-    /// This operation can fail if e.g. `message` contains file descriptors
+    /// The returned D-Bus message is completely identical to `message` except that it
+    /// is guaranteed to not be locked.
+    ///
+    /// This operation can fail if (for example) `message` contains file descriptors
     /// and the per-process or system-wide open files limit is reached.
     extern fn g_dbus_message_copy(p_message: *DBusMessage, p_error: ?*?*glib.Error) ?*gio.DBusMessage;
     pub const copy = g_dbus_message_copy;
@@ -4545,11 +4573,13 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_get_byte_order(p_message: *DBusMessage) gio.DBusMessageByteOrder;
     pub const getByteOrder = g_dbus_message_get_byte_order;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_DESTINATION` header field.
+    /// Convenience getter for the `gio.@"DBusMessageHeaderField.DESTINATION"`
+    /// header field.
     extern fn g_dbus_message_get_destination(p_message: *DBusMessage) ?[*:0]const u8;
     pub const getDestination = g_dbus_message_get_destination;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_ERROR_NAME` header field.
+    /// Convenience getter for the `gio.@"DBusMessageHeaderField.ERROR_NAME"`
+    /// header field.
     extern fn g_dbus_message_get_error_name(p_message: *DBusMessage) ?[*:0]const u8;
     pub const getErrorName = g_dbus_message_get_error_name;
 
@@ -4559,26 +4589,32 @@ pub const DBusMessage = opaque {
 
     /// Gets a header field on `message`.
     ///
-    /// The caller is responsible for checking the type of the returned `glib.Variant`
-    /// matches what is expected.
+    /// The caller is responsible for checking the type of the returned
+    /// `glib.Variant` matches what is expected.
     extern fn g_dbus_message_get_header(p_message: *DBusMessage, p_header_field: gio.DBusMessageHeaderField) ?*glib.Variant;
     pub const getHeader = g_dbus_message_get_header;
 
     /// Gets an array of all header fields on `message` that are set.
+    ///
+    /// Each element in the array is an `unsigned char`.
     extern fn g_dbus_message_get_header_fields(p_message: *DBusMessage) [*]u8;
     pub const getHeaderFields = g_dbus_message_get_header_fields;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_INTERFACE` header field.
+    /// Convenience getter for the `gio.@"DBusMessageHeaderField.INTERFACE"` header
+    /// field.
     extern fn g_dbus_message_get_interface(p_message: *DBusMessage) ?[*:0]const u8;
     pub const getInterface = g_dbus_message_get_interface;
 
-    /// Checks whether `message` is locked. To monitor changes to this
-    /// value, connect to the `gobject.Object.signals.notify` signal to listen for changes
-    /// on the `gio.DBusMessage.properties.locked` property.
+    /// Checks whether `message` is locked.
+    ///
+    /// To monitor changes to this value, connect to the
+    /// `gobject.Object.signals.notify` signal to listen for changes on the
+    /// `gio.DBusMessage.properties.locked` property.
     extern fn g_dbus_message_get_locked(p_message: *DBusMessage) c_int;
     pub const getLocked = g_dbus_message_get_locked;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_MEMBER` header field.
+    /// Convenience getter for the `gio.@"DBusMessageHeaderField.MEMBER"` header
+    /// field.
     extern fn g_dbus_message_get_member(p_message: *DBusMessage) ?[*:0]const u8;
     pub const getMember = g_dbus_message_get_member;
 
@@ -4586,19 +4622,23 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_get_message_type(p_message: *DBusMessage) gio.DBusMessageType;
     pub const getMessageType = g_dbus_message_get_message_type;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_NUM_UNIX_FDS` header field.
+    /// Convenience getter for the `gio.@"DBusMessageHeaderField.NUM_UNIX_FDS"`
+    /// header field.
     extern fn g_dbus_message_get_num_unix_fds(p_message: *DBusMessage) u32;
     pub const getNumUnixFds = g_dbus_message_get_num_unix_fds;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_PATH` header field.
+    /// Convenience getter for the `gio.@"DBusMessageHeaderField.PATH"` header
+    /// field.
     extern fn g_dbus_message_get_path(p_message: *DBusMessage) ?[*:0]const u8;
     pub const getPath = g_dbus_message_get_path;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_REPLY_SERIAL` header field.
+    /// Convenience getter for the `gio.@"DBusMessageHeaderField.REPLY_SERIAL"`
+    /// header field.
     extern fn g_dbus_message_get_reply_serial(p_message: *DBusMessage) u32;
     pub const getReplySerial = g_dbus_message_get_reply_serial;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_SENDER` header field.
+    /// Convenience getter for the `gio.@"DBusMessageHeaderField.SENDER"` header
+    /// field.
     extern fn g_dbus_message_get_sender(p_message: *DBusMessage) ?[*:0]const u8;
     pub const getSender = g_dbus_message_get_sender;
 
@@ -4606,7 +4646,8 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_get_serial(p_message: *DBusMessage) u32;
     pub const getSerial = g_dbus_message_get_serial;
 
-    /// Convenience getter for the `G_DBUS_MESSAGE_HEADER_FIELD_SIGNATURE` header field.
+    /// Convenience getter for the [enum`Gio`.DBusMessageHeaderField.SIGNATURE header
+    /// field.
     ///
     /// This will always be non-`NULL`, but may be an empty string.
     extern fn g_dbus_message_get_signature(p_message: *DBusMessage) [*:0]const u8;
@@ -4617,38 +4658,36 @@ pub const DBusMessage = opaque {
     /// This method is only available on UNIX.
     ///
     /// The file descriptors normally correspond to `G_VARIANT_TYPE_HANDLE`
-    /// values in the body of the message. For example,
-    /// if `glib.Variant.getHandle` returns 5, that is intended to be a reference
-    /// to the file descriptor that can be accessed by
+    /// values in the body of the message. For example, if
+    /// `glib.Variant.getHandle` returns 5, that is intended to be a
+    /// reference to the file descriptor that can be accessed by
     /// `g_unix_fd_list_get (list, 5, ...)`.
     extern fn g_dbus_message_get_unix_fd_list(p_message: *DBusMessage) ?*gio.UnixFDList;
     pub const getUnixFdList = g_dbus_message_get_unix_fd_list;
 
-    /// If `message` is locked, does nothing. Otherwise locks the message.
+    /// Locks the message.
+    ///
+    /// If `message` is locked already, this does nothing.
     extern fn g_dbus_message_lock(p_message: *DBusMessage) void;
     pub const lock = g_dbus_message_lock;
 
-    /// Creates a new `gio.DBusMessage` that is an error reply to `method_call_message`.
-    extern fn g_dbus_message_new_method_error(p_method_call_message: *DBusMessage, p_error_name: [*:0]const u8, p_error_message_format: [*:0]const u8, ...) *gio.DBusMessage;
-    pub const newMethodError = g_dbus_message_new_method_error;
-
-    /// Creates a new `gio.DBusMessage` that is an error reply to `method_call_message`.
+    /// Creates a new D-Bus message that is an error reply to `method_call_message`.
     extern fn g_dbus_message_new_method_error_literal(p_method_call_message: *DBusMessage, p_error_name: [*:0]const u8, p_error_message: [*:0]const u8) *gio.DBusMessage;
     pub const newMethodErrorLiteral = g_dbus_message_new_method_error_literal;
 
-    /// Like `gio.DBusMessage.newMethodError` but intended for language bindings.
+    /// Like `gio.DBusMessage.newMethodError` but intended for language
+    /// bindings.
     extern fn g_dbus_message_new_method_error_valist(p_method_call_message: *DBusMessage, p_error_name: [*:0]const u8, p_error_message_format: [*:0]const u8, p_var_args: std.builtin.VaList) *gio.DBusMessage;
     pub const newMethodErrorValist = g_dbus_message_new_method_error_valist;
 
-    /// Creates a new `gio.DBusMessage` that is a reply to `method_call_message`.
+    /// Creates a new D-Bus message that is a reply to `method_call_message`.
     extern fn g_dbus_message_new_method_reply(p_method_call_message: *DBusMessage) *gio.DBusMessage;
     pub const newMethodReply = g_dbus_message_new_method_reply;
 
     /// Produces a human-readable multi-line description of `message`.
     ///
-    /// The contents of the description has no ABI guarantees, the contents
-    /// and formatting is subject to change at any time. Typical output
-    /// looks something like this:
+    /// The contents and formatting are subject to change at any time and no ABI
+    /// guarantees are given. Typical output looks something like this:
     /// ```
     /// Flags:   none
     /// Version: 0
@@ -4679,9 +4718,10 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_print(p_message: *DBusMessage, p_indent: c_uint) [*:0]u8;
     pub const print = g_dbus_message_print;
 
-    /// Sets the body `message`. As a side-effect the
-    /// `G_DBUS_MESSAGE_HEADER_FIELD_SIGNATURE` header field is set to the
-    /// type string of `body` (or cleared if `body` is `NULL`).
+    /// Sets the body of `message`.
+    ///
+    /// As a side-effect the `gio.@"DBusMessageHeaderField.SIGNATURE"` header field
+    ///   is set to the type string of `body` (or cleared if `body` is `NULL`).
     ///
     /// If `body` is floating, `message` assumes ownership of `body`.
     extern fn g_dbus_message_set_body(p_message: *DBusMessage, p_body: *glib.Variant) void;
@@ -4691,12 +4731,14 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_set_byte_order(p_message: *DBusMessage, p_byte_order: gio.DBusMessageByteOrder) void;
     pub const setByteOrder = g_dbus_message_set_byte_order;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_DESTINATION` header field.
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.DESTINATION"`
+    /// header field.
     extern fn g_dbus_message_set_destination(p_message: *DBusMessage, p_value: ?[*:0]const u8) void;
     pub const setDestination = g_dbus_message_set_destination;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_ERROR_NAME` header field.
-    extern fn g_dbus_message_set_error_name(p_message: ?*DBusMessage, p_value: [*:0]const u8) void;
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.ERROR_NAME"`
+    /// header field.
+    extern fn g_dbus_message_set_error_name(p_message: *DBusMessage, p_value: ?[*:0]const u8) void;
     pub const setErrorName = g_dbus_message_set_error_name;
 
     /// Sets the flags to set on `message`.
@@ -4709,11 +4751,13 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_set_header(p_message: *DBusMessage, p_header_field: gio.DBusMessageHeaderField, p_value: ?*glib.Variant) void;
     pub const setHeader = g_dbus_message_set_header;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_INTERFACE` header field.
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.INTERFACE"` header
+    /// field.
     extern fn g_dbus_message_set_interface(p_message: *DBusMessage, p_value: ?[*:0]const u8) void;
     pub const setInterface = g_dbus_message_set_interface;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_MEMBER` header field.
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.MEMBER"` header
+    /// field.
     extern fn g_dbus_message_set_member(p_message: *DBusMessage, p_value: ?[*:0]const u8) void;
     pub const setMember = g_dbus_message_set_member;
 
@@ -4721,19 +4765,23 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_set_message_type(p_message: *DBusMessage, p_type: gio.DBusMessageType) void;
     pub const setMessageType = g_dbus_message_set_message_type;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_NUM_UNIX_FDS` header field.
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.NUM_UNIX_FDS"`
+    /// header field.
     extern fn g_dbus_message_set_num_unix_fds(p_message: *DBusMessage, p_value: u32) void;
     pub const setNumUnixFds = g_dbus_message_set_num_unix_fds;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_PATH` header field.
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.PATH"` header
+    /// field.
     extern fn g_dbus_message_set_path(p_message: *DBusMessage, p_value: ?[*:0]const u8) void;
     pub const setPath = g_dbus_message_set_path;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_REPLY_SERIAL` header field.
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.REPLY_SERIAL"`
+    /// header field.
     extern fn g_dbus_message_set_reply_serial(p_message: *DBusMessage, p_value: u32) void;
     pub const setReplySerial = g_dbus_message_set_reply_serial;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_SENDER` header field.
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.SENDER"` header
+    /// field.
     extern fn g_dbus_message_set_sender(p_message: *DBusMessage, p_value: ?[*:0]const u8) void;
     pub const setSender = g_dbus_message_set_sender;
 
@@ -4744,12 +4792,14 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_set_serial(p_message: *DBusMessage, p_serial: u32) void;
     pub const setSerial = g_dbus_message_set_serial;
 
-    /// Convenience setter for the `G_DBUS_MESSAGE_HEADER_FIELD_SIGNATURE` header field.
+    /// Convenience setter for the `gio.@"DBusMessageHeaderField.SIGNATURE"` header
+    /// field.
     extern fn g_dbus_message_set_signature(p_message: *DBusMessage, p_value: ?[*:0]const u8) void;
     pub const setSignature = g_dbus_message_set_signature;
 
-    /// Sets the UNIX file descriptors associated with `message`. As a
-    /// side-effect the `G_DBUS_MESSAGE_HEADER_FIELD_NUM_UNIX_FDS` header
+    /// Sets the UNIX file descriptors associated with `message`.
+    ///
+    /// As a side-effect the `gio.@"DBusMessageHeaderField.NUM_UNIX_FDS"` header
     /// field is set to the number of fds in `fd_list` (or cleared if
     /// `fd_list` is `NULL`).
     ///
@@ -4762,18 +4812,22 @@ pub const DBusMessage = opaque {
     extern fn g_dbus_message_set_unix_fd_list(p_message: *DBusMessage, p_fd_list: ?*gio.UnixFDList) void;
     pub const setUnixFdList = g_dbus_message_set_unix_fd_list;
 
-    /// Serializes `message` to a blob. The byte order returned by
-    /// `gio.DBusMessage.getByteOrder` will be used.
+    /// Serializes `message` to a blob.
+    ///
+    /// The byte order returned by `gio.DBusMessage.getByteOrder` will be
+    /// used.
     extern fn g_dbus_message_to_blob(p_message: *DBusMessage, p_out_size: *usize, p_capabilities: gio.DBusCapabilityFlags, p_error: ?*?*glib.Error) ?[*]u8;
     pub const toBlob = g_dbus_message_to_blob;
 
-    /// If `message` is not of type `G_DBUS_MESSAGE_TYPE_ERROR` does
-    /// nothing and returns `FALSE`.
+    /// Encodes the error in `message` as a `glib.Error`.
     ///
-    /// Otherwise this method encodes the error in `message` as a `glib.Error`
-    /// using `gio.DBusError.setDbusError` using the information in the
-    /// `G_DBUS_MESSAGE_HEADER_FIELD_ERROR_NAME` header field of `message` as
-    /// well as the first string item in `message`'s body.
+    /// If `message` is of type `gio.@"DBusMessageType.ERROR"`, this function
+    /// calls `gio.DBusError.setDbusError` using the information in the
+    /// `gio.@"DBusMessageHeaderField.ERROR_NAME"` header field of `message` as
+    /// well as the first string item in `message`’s body.
+    ///
+    /// If `message` is not of type `gio.@"DBusMessageType.ERROR"`, this function
+    /// does nothing and returns false.
     extern fn g_dbus_message_to_gerror(p_message: *DBusMessage, p_error: ?*?*glib.Error) c_int;
     pub const toGerror = g_dbus_message_to_gerror;
 
@@ -7073,8 +7127,8 @@ pub const FileEnumerator = extern struct {
         ///
         /// If `cancellable` is not `NULL`, then the operation can be cancelled by
         /// triggering the cancellable object from another thread. If the operation
-        /// was cancelled, the error `G_IO_ERROR_CANCELLED` will be returned in
-        /// `gio.FileEnumerator.closeFinish`.
+        /// was cancelled, the error `gio.@"IOErrorEnum.CANCELLED"` will be returned
+        /// by `gio.FileEnumerator.@"closeFinish()"`.
         pub const close_async = struct {
             pub fn call(p_class: anytype, p_enumerator: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void {
                 return gobject.ext.as(FileEnumerator.Class, p_class).f_close_async.?(gobject.ext.as(FileEnumerator, p_enumerator), p_io_priority, p_cancellable, p_callback, p_user_data);
@@ -7085,16 +7139,16 @@ pub const FileEnumerator = extern struct {
             }
         };
 
-        /// Finishes closing a file enumerator, started from `gio.FileEnumerator.closeAsync`.
+        /// Finishes closing a file enumerator, started by
+        /// `gio.FileEnumerator.closeAsync`.
         ///
-        /// If the file enumerator was already closed when `gio.FileEnumerator.closeAsync`
-        /// was called, then this function will report `G_IO_ERROR_CLOSED` in `error`, and
-        /// return `FALSE`. If the file enumerator had pending operation when the close
-        /// operation was started, then this function will report `G_IO_ERROR_PENDING`, and
-        /// return `FALSE`.  If `cancellable` was not `NULL`, then the operation may have been
-        /// cancelled by triggering the cancellable object from another thread. If the operation
-        /// was cancelled, the error `G_IO_ERROR_CANCELLED` will be set, and `FALSE` will be
-        /// returned.
+        /// If the file enumerator was already closed when
+        /// `gio.FileEnumerator.closeAsync` was called, then this function will
+        /// report `gio.@"IOErrorEnum.CLOSED"` in `error`. If the file enumerator had a
+        /// pending operation when the close operation was started, then
+        /// `gio.@"IOErrorEnum.PENDING"` will be reported. If the operation was
+        /// cancelled from another thread using `cancellable`,
+        /// `gio.@"IOErrorEnum.CANCELLED"` will be reported.
         pub const close_finish = struct {
             pub fn call(p_class: anytype, p_enumerator: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_result: *gio.AsyncResult, p_error: ?*?*glib.Error) c_int {
                 return gobject.ext.as(FileEnumerator.Class, p_class).f_close_finish.?(gobject.ext.as(FileEnumerator, p_enumerator), p_result, p_error);
@@ -7116,9 +7170,10 @@ pub const FileEnumerator = extern struct {
         };
 
         /// Returns information for the next file in the enumerated object.
+        ///
         /// Will block until the information is available. The `gio.FileInfo`
         /// returned from this function will contain attributes that match the
-        /// attribute string that was passed when the `gio.FileEnumerator` was created.
+        /// attribute string that was passed when the file enumerator was created.
         ///
         /// See the documentation of `gio.FileEnumerator` for information about the
         /// order of returned files.
@@ -7137,6 +7192,7 @@ pub const FileEnumerator = extern struct {
         };
 
         /// Request information for a number of files from the enumerator asynchronously.
+        ///
         /// When all I/O for the operation is finished the `callback` will be called with
         /// the requested information.
         ///
@@ -7145,14 +7201,14 @@ pub const FileEnumerator = extern struct {
         ///
         /// Once the end of the enumerator is reached, or if an error occurs, the
         /// `callback` will be called with an empty list. In this case, the previous call
-        /// to `gio.FileEnumerator.nextFilesAsync` will typically have returned fewer
-        /// than `num_files` items.
+        /// to `gio.FileEnumerator.nextFilesAsync` will typically have returned
+        /// fewer than `num_files` items.
         ///
         /// If a request is cancelled the callback will be called with
-        /// `G_IO_ERROR_CANCELLED`.
+        /// `gio.@"IOErrorEnum.CANCELLED"`.
         ///
         /// This leads to the following pseudo-code usage:
-        /// ```
+        /// ```c
         /// g_autoptr(GFile) dir = get_directory ();
         /// g_autoptr(GFileEnumerator) enumerator = NULL;
         /// g_autolist(GFileInfo) files = NULL;
@@ -7195,11 +7251,11 @@ pub const FileEnumerator = extern struct {
         /// ```
         ///
         /// During an async request no other sync and async calls are allowed, and will
-        /// result in `G_IO_ERROR_PENDING` errors.
+        /// result in `gio.@"IOErrorEnum.PENDING"` errors.
         ///
         /// Any outstanding I/O request with higher priority (lower numerical value) will
         /// be executed before an outstanding request with lower priority. Default
-        /// priority is `G_PRIORITY_DEFAULT`.
+        /// priority is `glib.PRIORITY_DEFAULT`.
         pub const next_files_async = struct {
             pub fn call(p_class: anytype, p_enumerator: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_num_files: c_int, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void {
                 return gobject.ext.as(FileEnumerator.Class, p_class).f_next_files_async.?(gobject.ext.as(FileEnumerator, p_enumerator), p_num_files, p_io_priority, p_cancellable, p_callback, p_user_data);
@@ -7210,7 +7266,8 @@ pub const FileEnumerator = extern struct {
             }
         };
 
-        /// Finishes the asynchronous operation started with `gio.FileEnumerator.nextFilesAsync`.
+        /// Finishes the asynchronous operation started with
+        /// `gio.FileEnumerator.@"nextFilesAsync()"`.
         pub const next_files_finish = struct {
             pub fn call(p_class: anytype, p_enumerator: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_result: *gio.AsyncResult, p_error: ?*?*glib.Error) ?*glib.List {
                 return gobject.ext.as(FileEnumerator.Class, p_class).f_next_files_finish.?(gobject.ext.as(FileEnumerator, p_enumerator), p_result, p_error);
@@ -7233,8 +7290,10 @@ pub const FileEnumerator = extern struct {
 
     pub const signals = struct {};
 
-    /// Releases all resources used by this enumerator, making the
-    /// enumerator return `G_IO_ERROR_CLOSED` on all calls.
+    /// Releases all resources used by this enumerator.
+    ///
+    /// The enumerator will return `gio.@"IOErrorEnum.CLOSED"` on all subsequent
+    /// calls.
     ///
     /// This will be automatically called when the last reference
     /// is dropped, but you might want to call this function to make
@@ -7246,36 +7305,37 @@ pub const FileEnumerator = extern struct {
     ///
     /// If `cancellable` is not `NULL`, then the operation can be cancelled by
     /// triggering the cancellable object from another thread. If the operation
-    /// was cancelled, the error `G_IO_ERROR_CANCELLED` will be returned in
-    /// `gio.FileEnumerator.closeFinish`.
+    /// was cancelled, the error `gio.@"IOErrorEnum.CANCELLED"` will be returned
+    /// by `gio.FileEnumerator.@"closeFinish()"`.
     extern fn g_file_enumerator_close_async(p_enumerator: *FileEnumerator, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void;
     pub const closeAsync = g_file_enumerator_close_async;
 
-    /// Finishes closing a file enumerator, started from `gio.FileEnumerator.closeAsync`.
+    /// Finishes closing a file enumerator, started by
+    /// `gio.FileEnumerator.closeAsync`.
     ///
-    /// If the file enumerator was already closed when `gio.FileEnumerator.closeAsync`
-    /// was called, then this function will report `G_IO_ERROR_CLOSED` in `error`, and
-    /// return `FALSE`. If the file enumerator had pending operation when the close
-    /// operation was started, then this function will report `G_IO_ERROR_PENDING`, and
-    /// return `FALSE`.  If `cancellable` was not `NULL`, then the operation may have been
-    /// cancelled by triggering the cancellable object from another thread. If the operation
-    /// was cancelled, the error `G_IO_ERROR_CANCELLED` will be set, and `FALSE` will be
-    /// returned.
+    /// If the file enumerator was already closed when
+    /// `gio.FileEnumerator.closeAsync` was called, then this function will
+    /// report `gio.@"IOErrorEnum.CLOSED"` in `error`. If the file enumerator had a
+    /// pending operation when the close operation was started, then
+    /// `gio.@"IOErrorEnum.PENDING"` will be reported. If the operation was
+    /// cancelled from another thread using `cancellable`,
+    /// `gio.@"IOErrorEnum.CANCELLED"` will be reported.
     extern fn g_file_enumerator_close_finish(p_enumerator: *FileEnumerator, p_result: *gio.AsyncResult, p_error: ?*?*glib.Error) c_int;
     pub const closeFinish = g_file_enumerator_close_finish;
 
-    /// Return a new `gio.File` which refers to the file named by `info` in the source
-    /// directory of `enumerator`.  This function is primarily intended to be used
-    /// inside loops with `gio.FileEnumerator.nextFile`.
+    /// Returns a new `gio.File` which refers to the file named by `info` in the
+    /// source directory of `enumerator`.
     ///
-    /// To use this, `G_FILE_ATTRIBUTE_STANDARD_NAME` must have been listed in the
-    /// attributes list used when creating the `gio.FileEnumerator`.
+    /// This function is primarily intended to be used inside loops with
+    /// `gio.FileEnumerator.nextFile`.
+    ///
+    /// To use this, `gio.FILE_ATTRIBUTE_STANDARD_NAME` must have been listed
+    /// in the attributes list used when creating the `gio.FileEnumerator`.
     ///
     /// This is a convenience method that's equivalent to:
-    /// ```
-    ///   gchar *name = g_file_info_get_name (info);
-    ///   GFile *child = g_file_get_child (g_file_enumerator_get_container (enumr),
-    ///                                    name);
+    /// ```c
+    /// char *name = g_file_info_get_name (info);
+    /// GFile *child = g_file_get_child (g_file_enumerator_get_container (enumerator), name);
     /// ```
     extern fn g_file_enumerator_get_child(p_enumerator: *FileEnumerator, p_info: *gio.FileInfo) *gio.File;
     pub const getChild = g_file_enumerator_get_child;
@@ -7292,14 +7352,16 @@ pub const FileEnumerator = extern struct {
     extern fn g_file_enumerator_is_closed(p_enumerator: *FileEnumerator) c_int;
     pub const isClosed = g_file_enumerator_is_closed;
 
-    /// This is a version of `gio.FileEnumerator.nextFile` that's easier to
-    /// use correctly from C programs.  With `gio.FileEnumerator.nextFile`,
-    /// the gboolean return value signifies "end of iteration or error", which
-    /// requires allocation of a temporary `glib.Error`.
+    /// A version of `gio.FileEnumerator.nextFile` that’s easier to use
+    /// correctly from C programs.
     ///
-    /// In contrast, with this function, a `FALSE` return from
-    /// `gio.FileEnumerator.iterate` *always* means
-    /// "error".  End of iteration is signaled by `out_info` or `out_child` being `NULL`.
+    /// With `gio.FileEnumerator.nextFile`, the boolean return value
+    /// signifies “end of iteration or error”, which requires allocation of a
+    /// temporary `glib.Error` to distinguish which one.
+    ///
+    /// In contrast, with this function, a false return from
+    /// `gio.FileEnumerator.iterate` *always* means “error”.  End of iteration
+    /// is signaled by `out_info` or `out_child` being `NULL`.
     ///
     /// Another crucial difference is that the references for `out_info` and
     /// `out_child` are owned by `direnum` (they are cached as hidden
@@ -7307,24 +7369,30 @@ pub const FileEnumerator = extern struct {
     /// memory management significantly easier for C code in combination
     /// with loops.
     ///
-    /// Finally, this function optionally allows retrieving a `gio.File` as
-    /// well.
+    /// Finally, this function optionally allows retrieving a corresponding
+    /// `gio.File` as well as each `gio.FileInfo`.
+    ///
+    /// To use this, `gio.FILE_ATTRIBUTE_STANDARD_NAME` must have been listed
+    /// in the attributes list used when creating the `gio.FileEnumerator`.
     ///
     /// You must specify at least one of `out_info` or `out_child`.
     ///
-    /// The code pattern for correctly using `gio.FileEnumerator.iterate` from C
-    /// is:
+    /// The code pattern for correctly using `gio.FileEnumerator.iterate` from
+    /// C is:
     ///
-    /// ```
+    /// ```c
     /// direnum = g_file_enumerate_children (file, ...);
     /// while (TRUE)
     ///   {
-    ///     GFileInfo *info;
+    ///     GFileInfo *info = NULL;
+    ///
     ///     if (!g_file_enumerator_iterate (direnum, &info, NULL, cancellable, error))
     ///       goto out;
-    ///     if (!info)
+    ///
+    ///     if (info == NULL)
     ///       break;
-    ///     ... do stuff with "info"; do not unref it! ...
+    ///
+    ///     // do stuff with "info"; do not unref it! ...
     ///   }
     ///
     /// out:
@@ -7334,9 +7402,10 @@ pub const FileEnumerator = extern struct {
     pub const iterate = g_file_enumerator_iterate;
 
     /// Returns information for the next file in the enumerated object.
+    ///
     /// Will block until the information is available. The `gio.FileInfo`
     /// returned from this function will contain attributes that match the
-    /// attribute string that was passed when the `gio.FileEnumerator` was created.
+    /// attribute string that was passed when the file enumerator was created.
     ///
     /// See the documentation of `gio.FileEnumerator` for information about the
     /// order of returned files.
@@ -7348,6 +7417,7 @@ pub const FileEnumerator = extern struct {
     pub const nextFile = g_file_enumerator_next_file;
 
     /// Request information for a number of files from the enumerator asynchronously.
+    ///
     /// When all I/O for the operation is finished the `callback` will be called with
     /// the requested information.
     ///
@@ -7356,14 +7426,14 @@ pub const FileEnumerator = extern struct {
     ///
     /// Once the end of the enumerator is reached, or if an error occurs, the
     /// `callback` will be called with an empty list. In this case, the previous call
-    /// to `gio.FileEnumerator.nextFilesAsync` will typically have returned fewer
-    /// than `num_files` items.
+    /// to `gio.FileEnumerator.nextFilesAsync` will typically have returned
+    /// fewer than `num_files` items.
     ///
     /// If a request is cancelled the callback will be called with
-    /// `G_IO_ERROR_CANCELLED`.
+    /// `gio.@"IOErrorEnum.CANCELLED"`.
     ///
     /// This leads to the following pseudo-code usage:
-    /// ```
+    /// ```c
     /// g_autoptr(GFile) dir = get_directory ();
     /// g_autoptr(GFileEnumerator) enumerator = NULL;
     /// g_autolist(GFileInfo) files = NULL;
@@ -7406,15 +7476,16 @@ pub const FileEnumerator = extern struct {
     /// ```
     ///
     /// During an async request no other sync and async calls are allowed, and will
-    /// result in `G_IO_ERROR_PENDING` errors.
+    /// result in `gio.@"IOErrorEnum.PENDING"` errors.
     ///
     /// Any outstanding I/O request with higher priority (lower numerical value) will
     /// be executed before an outstanding request with lower priority. Default
-    /// priority is `G_PRIORITY_DEFAULT`.
+    /// priority is `glib.PRIORITY_DEFAULT`.
     extern fn g_file_enumerator_next_files_async(p_enumerator: *FileEnumerator, p_num_files: c_int, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void;
     pub const nextFilesAsync = g_file_enumerator_next_files_async;
 
-    /// Finishes the asynchronous operation started with `gio.FileEnumerator.nextFilesAsync`.
+    /// Finishes the asynchronous operation started with
+    /// `gio.FileEnumerator.@"nextFilesAsync()"`.
     extern fn g_file_enumerator_next_files_finish(p_enumerator: *FileEnumerator, p_result: *gio.AsyncResult, p_error: ?*?*glib.Error) ?*glib.List;
     pub const nextFilesFinish = g_file_enumerator_next_files_finish;
 
@@ -7929,6 +8000,11 @@ pub const FileInfo = opaque {
     pub const getIcon = g_file_info_get_icon;
 
     /// Checks if a file is a backup file.
+    ///
+    /// The exact semantics of what constitutes a backup file are
+    /// backend-specific. For local files, a file is considered a backup
+    /// if its name ends with `~` and it is a regular file. This follows
+    /// the POSIX convention used by text editors such as Emacs.
     ///
     /// It is an error to call this if the `gio.FileInfo` does not contain
     /// `G_FILE_ATTRIBUTE_STANDARD_IS_BACKUP`.
@@ -8758,6 +8834,8 @@ pub const FilenameCompleter = opaque {
     pub const getCompletionSuffix = g_filename_completer_get_completion_suffix;
 
     /// Gets an array of completion strings for a given initial text.
+    ///
+    /// The strings are returned in an undefined order.
     extern fn g_filename_completer_get_completions(p_completer: *FilenameCompleter, p_initial_text: [*:0]const u8) [*][*:0]u8;
     pub const getCompletions = g_filename_completer_get_completions;
 
@@ -9173,7 +9251,11 @@ pub const IOStream = extern struct {
     extern fn g_io_stream_has_pending(p_stream: *IOStream) c_int;
     pub const hasPending = g_io_stream_has_pending;
 
-    /// Checks if a stream is closed.
+    /// Checks if a stream has been closed.
+    ///
+    /// This only indicates whether the I/O stream has been closed at the top level
+    /// by calling `gio.IOStream.close`. If the underlying input and output
+    /// streams have been closed separately, this method will still return false.
     extern fn g_io_stream_is_closed(p_stream: *IOStream) c_int;
     pub const isClosed = g_io_stream_is_closed;
 
@@ -9203,6 +9285,116 @@ pub const IOStream = extern struct {
     pub const unref = g_object_unref;
 
     pub fn as(p_instance: *IOStream, comptime P_T: type) *P_T {
+        return gobject.ext.as(P_T, p_instance);
+    }
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
+/// Contains the type of service (ToS) byte of an IPv4 header.
+///
+/// This consists of the DSCP field as per
+/// [RFC 2474](https://www.rfc-editor.org/rfc/rfc2474`section`-3),
+/// and the ECN field as per
+/// [RFC 3168](https://www.rfc-editor.org/rfc/rfc3168`section`-5).
+///
+/// It may be received using `gio.Socket.receiveMessage` over UDP sockets
+/// (i.e. sockets in the `G_SOCKET_FAMILY_IPV4` family with
+/// `G_SOCKET_TYPE_DATAGRAM` type). The message is not meant for sending. To set
+/// ToS field to be used in datagrams sent on a `gio.Socket` use:
+/// ```c
+/// g_socket_set_option (socket, IPPROTO_IP, IP_TOS, <ToS value>, &error);
+/// ```
+pub const IPTosMessage = opaque {
+    pub const Parent = gio.SocketControlMessage;
+    pub const Implements = [_]type{};
+    pub const Class = gio.IPTosMessageClass;
+    pub const virtual_methods = struct {};
+
+    pub const properties = struct {};
+
+    pub const signals = struct {};
+
+    /// Creates a new type-of-service message with given DSCP and ECN values.
+    extern fn g_ip_tos_message_new(p_dscp: u8, p_ecn: gio.EcnCodePoint) *gio.IPTosMessage;
+    pub const new = g_ip_tos_message_new;
+
+    /// Gets the differentiated services code point stored in `message`.
+    extern fn g_ip_tos_message_get_dscp(p_message: *IPTosMessage) u8;
+    pub const getDscp = g_ip_tos_message_get_dscp;
+
+    /// Gets the Explicit Congestion Notification code point stored in `message`.
+    extern fn g_ip_tos_message_get_ecn(p_message: *IPTosMessage) gio.EcnCodePoint;
+    pub const getEcn = g_ip_tos_message_get_ecn;
+
+    extern fn g_ip_tos_message_get_type() usize;
+    pub const getGObjectType = g_ip_tos_message_get_type;
+
+    extern fn g_object_ref(p_self: *gio.IPTosMessage) void;
+    pub const ref = g_object_ref;
+
+    extern fn g_object_unref(p_self: *gio.IPTosMessage) void;
+    pub const unref = g_object_unref;
+
+    pub fn as(p_instance: *IPTosMessage, comptime P_T: type) *P_T {
+        return gobject.ext.as(P_T, p_instance);
+    }
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
+/// Contains the Traffic Class byte of an IPv6 header.
+///
+/// This consists of the DSCP field as per
+/// [RFC 2474](https://www.rfc-editor.org/rfc/rfc2474`section`-3),
+/// and the ECN field as per
+/// [RFC 3168](https://www.rfc-editor.org/rfc/rfc3168`section`-5).
+///
+/// It may be received using `gio.Socket.receiveMessage` over UDP sockets
+/// (i.e. sockets in the `G_SOCKET_FAMILY_IPV6` family with
+/// `G_SOCKET_TYPE_DATAGRAM` type). The message is not meant for sending. To set
+/// Traffic Class field to be used in datagrams sent on a `gio.Socket` use:
+/// ```c
+/// g_socket_set_option (socket, IPPROTO_IPV6, IPV6_TCLASS, <TC value>, &error);
+/// ```
+pub const IPv6TclassMessage = opaque {
+    pub const Parent = gio.SocketControlMessage;
+    pub const Implements = [_]type{};
+    pub const Class = gio.IPv6TclassMessageClass;
+    pub const virtual_methods = struct {};
+
+    pub const properties = struct {};
+
+    pub const signals = struct {};
+
+    /// Creates a new traffic class message with given DSCP and ECN values.
+    extern fn g_ipv6_tclass_message_new(p_dscp: u8, p_ecn: gio.EcnCodePoint) *gio.IPv6TclassMessage;
+    pub const new = g_ipv6_tclass_message_new;
+
+    /// Gets the differentiated services code point stored in `message`.
+    extern fn g_ipv6_tclass_message_get_dscp(p_message: *IPv6TclassMessage) u8;
+    pub const getDscp = g_ipv6_tclass_message_get_dscp;
+
+    /// Gets the Explicit Congestion Notification code point stored in `message`.
+    extern fn g_ipv6_tclass_message_get_ecn(p_message: *IPv6TclassMessage) gio.EcnCodePoint;
+    pub const getEcn = g_ipv6_tclass_message_get_ecn;
+
+    extern fn g_ipv6_tclass_message_get_type() usize;
+    pub const getGObjectType = g_ipv6_tclass_message_get_type;
+
+    extern fn g_object_ref(p_self: *gio.IPv6TclassMessage) void;
+    pub const ref = g_object_ref;
+
+    extern fn g_object_unref(p_self: *gio.IPv6TclassMessage) void;
+    pub const unref = g_object_unref;
+
+    pub fn as(p_instance: *IPv6TclassMessage, comptime P_T: type) *P_T {
         return gobject.ext.as(P_T, p_instance);
     }
 
@@ -9773,11 +9965,11 @@ pub const InputStream = extern struct {
         /// asynchronicity, so they are optional for inheriting classes. However, if you
         /// override one you must override all.
         pub const read_async = struct {
-            pub fn call(p_class: anytype, p_stream: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_buffer: ?*[*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void {
+            pub fn call(p_class: anytype, p_stream: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_buffer: ?[*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void {
                 return gobject.ext.as(InputStream.Class, p_class).f_read_async.?(gobject.ext.as(InputStream, p_stream), p_buffer, p_count, p_io_priority, p_cancellable, p_callback, p_user_data);
             }
 
-            pub fn implement(p_class: anytype, p_implementation: *const fn (p_stream: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_buffer: ?*[*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) callconv(.c) void) void {
+            pub fn implement(p_class: anytype, p_implementation: *const fn (p_stream: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_buffer: ?[*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) callconv(.c) void) void {
                 gobject.ext.as(InputStream.Class, p_class).f_read_async = @ptrCast(p_implementation);
             }
         };
@@ -9927,7 +10119,13 @@ pub const InputStream = extern struct {
     extern fn g_input_stream_has_pending(p_stream: *InputStream) c_int;
     pub const hasPending = g_input_stream_has_pending;
 
-    /// Checks if an input stream is closed.
+    /// Checks if an input stream has been closed.
+    ///
+    /// This only indicates whether the stream has been closed from this end by
+    /// calling `gio.InputStream.close`. If the stream is a pipe or socket,
+    /// for example, and the process on the other end has closed its end, this method
+    /// will still return false. Methods which try to read from the input stream will
+    /// return any remaining data, end-of-file or an error, however.
     extern fn g_input_stream_is_closed(p_stream: *InputStream) c_int;
     pub const isClosed = g_input_stream_is_closed;
 
@@ -9952,7 +10150,7 @@ pub const InputStream = extern struct {
     /// partial result will be returned, without an error.
     ///
     /// On error -1 is returned and `error` is set accordingly.
-    extern fn g_input_stream_read(p_stream: *InputStream, p_buffer: *[*]u8, p_count: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
+    extern fn g_input_stream_read(p_stream: *InputStream, p_buffer: [*]u8, p_count: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
     pub const read = g_input_stream_read;
 
     /// Tries to read `count` bytes from the stream into the buffer starting at
@@ -9974,7 +10172,7 @@ pub const InputStream = extern struct {
     /// read before the error was encountered.  This functionality is only
     /// available from C.  If you need it from another language then you must
     /// write your own loop around `gio.InputStream.read`.
-    extern fn g_input_stream_read_all(p_stream: *InputStream, p_buffer: *[*]u8, p_count: usize, p_bytes_read: *usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) c_int;
+    extern fn g_input_stream_read_all(p_stream: *InputStream, p_buffer: [*]u8, p_count: usize, p_bytes_read: *usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) c_int;
     pub const readAll = g_input_stream_read_all;
 
     /// Request an asynchronous read of `count` bytes from the stream into the
@@ -9987,7 +10185,7 @@ pub const InputStream = extern struct {
     /// Any outstanding I/O request with higher priority (lower numerical
     /// value) will be executed before an outstanding request with lower
     /// priority. Default priority is `G_PRIORITY_DEFAULT`.
-    extern fn g_input_stream_read_all_async(p_stream: *InputStream, p_buffer: *[*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void;
+    extern fn g_input_stream_read_all_async(p_stream: *InputStream, p_buffer: [*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void;
     pub const readAllAsync = g_input_stream_read_all_async;
 
     /// Finishes an asynchronous stream read operation started with
@@ -10025,7 +10223,7 @@ pub const InputStream = extern struct {
     /// The asynchronous methods have a default fallback that uses threads to implement
     /// asynchronicity, so they are optional for inheriting classes. However, if you
     /// override one you must override all.
-    extern fn g_input_stream_read_async(p_stream: *InputStream, p_buffer: *[*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void;
+    extern fn g_input_stream_read_async(p_stream: *InputStream, p_buffer: [*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) void;
     pub const readAsync = g_input_stream_read_async;
 
     /// Like `gio.InputStream.read`, this tries to read `count` bytes from
@@ -11290,6 +11488,7 @@ pub const MenuLinkIter = extern struct {
 /// While a wide variety of stateful actions is possible, the following
 /// is the minimum that is expected to be supported by all users of exported
 /// menu information:
+///
 /// - an action with no parameter type and no state
 /// - an action with no parameter type and boolean state
 /// - an action with string parameter type and string state
@@ -11458,7 +11657,7 @@ pub const MenuModel = extern struct {
         ///
         /// As an example, if the menu contains items a, b, c, d (in that
         /// order) and the signal (2, 1, 3) occurs then the new composition of
-        /// the menu will be a, b, _, _, _, d (with each _ representing some
+        /// the menu will be a, b, \_, \_, \_, d (with each _ representing some
         /// new item).
         ///
         /// Signal handlers may query the model (particularly the added items)
@@ -12332,6 +12531,9 @@ pub const NetworkService = extern struct {
 /// clicked.
 ///
 /// A notification can be sent with `gio.Application.sendNotification`.
+///
+/// In Windows, notification actions are unsupported, when sending the notification
+/// a warning will be printed if a default action or action buttons were added.
 pub const Notification = opaque {
     pub const Parent = gobject.Object;
     pub const Implements = [_]type{};
@@ -12881,7 +13083,13 @@ pub const OutputStream = extern struct {
     extern fn g_output_stream_has_pending(p_stream: *OutputStream) c_int;
     pub const hasPending = g_output_stream_has_pending;
 
-    /// Checks if an output stream has already been closed.
+    /// Checks if an output stream has been closed.
+    ///
+    /// This only indicates whether the stream has been closed from this end by
+    /// calling `gio.OutputStream.close`. If the stream is a pipe or socket,
+    /// for example, and the process on the other end has closed its end, this method
+    /// will still return false. Methods which try to write to the output stream will
+    /// return an error, however.
     extern fn g_output_stream_is_closed(p_stream: *OutputStream) c_int;
     pub const isClosed = g_output_stream_is_closed;
 
@@ -17188,11 +17396,13 @@ pub const Socket = extern struct {
     extern fn g_socket_get_family(p_socket: *Socket) gio.SocketFamily;
     pub const getFamily = g_socket_get_family;
 
-    /// Returns the underlying OS socket object. On unix this
-    /// is a socket file descriptor, and on Windows this is
-    /// a Winsock2 SOCKET handle. This may be useful for
-    /// doing platform specific or otherwise unusual operations
-    /// on the socket.
+    /// Gets the underlying OS socket descriptor.
+    ///
+    /// On Unix this is a socket file descriptor, and on Windows this is
+    /// a Winsock2 `SOCKET` handle.
+    ///
+    /// This may be useful for doing platform specific or otherwise unusual
+    /// operations on the socket.
     extern fn g_socket_get_fd(p_socket: *Socket) c_int;
     pub const getFd = g_socket_get_fd;
 
@@ -17367,7 +17577,7 @@ pub const Socket = extern struct {
     /// `G_IO_IN` condition.
     ///
     /// On error -1 is returned and `error` is set accordingly.
-    extern fn g_socket_receive(p_socket: *Socket, p_buffer: *[*]u8, p_size: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
+    extern fn g_socket_receive(p_socket: *Socket, p_buffer: [*]u8, p_size: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
     pub const receive = g_socket_receive;
 
     /// Receives data (up to `size` bytes) from a socket.
@@ -17406,7 +17616,7 @@ pub const Socket = extern struct {
     /// `address` is owned by the caller.
     ///
     /// See `gio.Socket.receive` for additional information.
-    extern fn g_socket_receive_from(p_socket: *Socket, p_address: ?**gio.SocketAddress, p_buffer: *[*]u8, p_size: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
+    extern fn g_socket_receive_from(p_socket: *Socket, p_address: ?**gio.SocketAddress, p_buffer: [*]u8, p_size: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
     pub const receiveFrom = g_socket_receive_from;
 
     /// Receive data from a socket.  For receiving multiple messages, see
@@ -17525,7 +17735,7 @@ pub const Socket = extern struct {
     /// This behaves exactly the same as `gio.Socket.receive`, except that
     /// the choice of blocking or non-blocking behavior is determined by
     /// the `blocking` argument rather than by `socket`'s properties.
-    extern fn g_socket_receive_with_blocking(p_socket: *Socket, p_buffer: *[*]u8, p_size: usize, p_blocking: c_int, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
+    extern fn g_socket_receive_with_blocking(p_socket: *Socket, p_buffer: [*]u8, p_size: usize, p_blocking: c_int, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
     pub const receiveWithBlocking = g_socket_receive_with_blocking;
 
     /// Tries to send `size` bytes from `buffer` on the socket. This is
@@ -18681,7 +18891,7 @@ pub const SocketConnection = extern struct {
 /// These messages are sent with `gio.Socket.sendMessage` and received
 /// with `gio.Socket.receiveMessage`.
 ///
-/// To extend the set of control message that can be sent, subclass this
+/// To extend the set of control messages that can be sent, subclass this
 /// class and override the `get_size`, `get_level`, `get_type` and `serialize`
 /// methods.
 ///
@@ -23545,10 +23755,9 @@ pub const UnixFDList = extern struct {
     extern fn g_unix_fd_list_new() *gio.UnixFDList;
     pub const new = g_unix_fd_list_new;
 
-    /// Creates a new `gio.UnixFDList` containing the file descriptors given in
-    /// `fds`.  The file descriptors become the property of the new list and
-    /// may no longer be used by the caller.  The array itself is owned by
-    /// the caller.
+    /// Creates a new `gio.UnixFDList` containing the file descriptors given
+    /// in `fds`. The file descriptors become the property of the new list and may no
+    /// longer be used by the caller. The array itself is owned by the caller.
     ///
     /// Each file descriptor in the array should be set to close-on-exec.
     ///
@@ -23558,7 +23767,7 @@ pub const UnixFDList = extern struct {
 
     /// Adds a file descriptor to `list`.
     ///
-    /// The file descriptor is duplicated using `dup`. You keep your copy
+    /// The file descriptor is duplicated using ``dup``. You keep your copy
     /// of the descriptor and the copy contained in `list` will be closed
     /// when `list` is finalized.
     ///
@@ -23571,14 +23780,28 @@ pub const UnixFDList = extern struct {
     extern fn g_unix_fd_list_append(p_list: *UnixFDList, p_fd: c_int, p_error: ?*?*glib.Error) c_int;
     pub const append = g_unix_fd_list_append;
 
+    /// Adds a file descriptor to `list`.
+    ///
+    /// After this call, `fd` belongs to the `list` and may no longer be closed by the
+    /// caller.
+    ///
+    /// The file descriptor `fd` should be set to close-on-exec.
+    ///
+    /// The index of the file descriptor in the list is returned. If you use this
+    /// index with `gio.UnixFDList.get` then you will receive back a
+    /// duplicated copy of the same file descriptor.
+    extern fn g_unix_fd_list_append_take(p_list: *UnixFDList, p_fd: c_int) usize;
+    pub const appendTake = g_unix_fd_list_append_take;
+
     /// Gets a file descriptor out of `list`.
     ///
     /// `index_` specifies the index of the file descriptor to get.  It is a
-    /// programmer error for `index_` to be out of range; see
-    /// `gio.UnixFDList.getLength`.
+    /// programmer error for `index_` to be out of range. Either use
+    /// `gio.UnixFDList.lookup` to do a checked lookup, or check the index
+    /// against the list length using `gio.UnixFDList.getLength`.
     ///
-    /// The file descriptor is duplicated using `dup` and set as
-    /// close-on-exec before being returned.  You must call `close` on it
+    /// The file descriptor is duplicated using ``dup`` and set as
+    /// close-on-exec before being returned.  You must call ``close`` on it
     /// when you are done.
     ///
     /// A possible cause of failure is exceeding the per-process or
@@ -23591,6 +23814,30 @@ pub const UnixFDList = extern struct {
     extern fn g_unix_fd_list_get_length(p_list: *UnixFDList) c_int;
     pub const getLength = g_unix_fd_list_get_length;
 
+    /// Looks up a file descriptor in `list` at position `index_`.
+    ///
+    /// `index_` specifies the index of the file descriptor to get. If no file
+    /// descriptor exists at this index, `-1` is returned.
+    ///
+    /// After this call, the descriptor remains the property of `list`. The caller
+    /// must not close it. The descriptor is valid only until `list` is changed in any
+    /// way.
+    extern fn g_unix_fd_list_lookup(p_list: *UnixFDList, p_index_: usize) c_int;
+    pub const lookup = g_unix_fd_list_lookup;
+
+    /// Gets a file descriptor out of `list`.
+    ///
+    /// `index_` specifies the index of the file descriptor to get. It is a programmer
+    /// error for `index_` to be out of range; see `gio.UnixFDList.getLength`.
+    ///
+    /// This will always return a valid (non-negative) file descriptor.
+    ///
+    /// After this call, the descriptor remains the property of `list`. The caller
+    /// must not close it. The descriptor is valid only until `list` is changed in any
+    /// way.
+    extern fn g_unix_fd_list_peek(p_list: *UnixFDList, p_index_: usize) c_int;
+    pub const peek = g_unix_fd_list_peek;
+
     /// Returns the array of file descriptors that is contained in this
     /// object.
     ///
@@ -23600,7 +23847,7 @@ pub const UnixFDList = extern struct {
     ///
     /// If `length` is non-`NULL` then it is set to the number of file
     /// descriptors in the returned array. The returned array is also
-    /// terminated with -1.
+    /// terminated with `-1`.
     ///
     /// This function never returns `NULL`. In case there are no file
     /// descriptors contained in `list`, an empty array is returned.
@@ -23614,14 +23861,14 @@ pub const UnixFDList = extern struct {
     /// `list`. Further calls will return an empty list (unless more
     /// descriptors have been added).
     ///
-    /// The return result of this function must be freed with `glib.free`.
+    /// The return result of this function must be freed with ``glib.free``.
     /// The caller is also responsible for closing all of the file
     /// descriptors.  The file descriptors in the array are set to
     /// close-on-exec.
     ///
     /// If `length` is non-`NULL` then it is set to the number of file
     /// descriptors in the returned array. The returned array is also
-    /// terminated with -1.
+    /// terminated with `-1`.
     ///
     /// This function never returns `NULL`. In case there are no file
     /// descriptors contained in `list`, an empty array is returned.
@@ -26061,11 +26308,11 @@ pub const AppInfo = opaque {
         /// `gio.AppInfo.addSupportsType`, but only those exported directly by
         /// the application.
         pub const get_supported_types = struct {
-            pub fn call(p_class: anytype, p_appinfo: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) [*][*:0]const u8 {
+            pub fn call(p_class: anytype, p_appinfo: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) ?[*][*:0]const u8 {
                 return gobject.ext.as(AppInfo.Iface, p_class).f_get_supported_types.?(gobject.ext.as(AppInfo, p_appinfo));
             }
 
-            pub fn implement(p_class: anytype, p_implementation: *const fn (p_appinfo: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) callconv(.c) [*][*:0]const u8) void {
+            pub fn implement(p_class: anytype, p_implementation: *const fn (p_appinfo: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) callconv(.c) ?[*][*:0]const u8) void {
                 gobject.ext.as(AppInfo.Iface, p_class).f_get_supported_types = @ptrCast(p_implementation);
             }
         };
@@ -26244,7 +26491,9 @@ pub const AppInfo = opaque {
 
     /// Creates a new `gio.AppInfo` from the given information.
     ///
-    /// Note that for `commandline`, the quoting rules of the `Exec` key of the
+    /// When constructing `commandline`, quote any filenames or potentially-
+    /// untrusted input using `glib.shellQuote`, and note that the
+    /// quoting rules of the `Exec` key of the
     /// [freedesktop.org Desktop Entry Specification](http://freedesktop.org/Standards/desktop-entry-spec)
     /// are applied. For example, if the `commandline` contains
     /// percent-encoded URIs, the percent-character must be doubled in order to prevent it from
@@ -26446,7 +26695,7 @@ pub const AppInfo = opaque {
     /// This function does not take in consideration associations added with
     /// `gio.AppInfo.addSupportsType`, but only those exported directly by
     /// the application.
-    extern fn g_app_info_get_supported_types(p_appinfo: *AppInfo) [*][*:0]const u8;
+    extern fn g_app_info_get_supported_types(p_appinfo: *AppInfo) ?[*][*:0]const u8;
     pub const getSupportedTypes = g_app_info_get_supported_types;
 
     /// Launches the application. Passes `files` to the launched application
@@ -27254,12 +27503,17 @@ pub const DBusInterface = opaque {
 
         /// Gets D-Bus introspection information for the D-Bus interface
         /// implemented by `interface_`.
+        ///
+        /// This can return `NULL` if no `gio.DBusInterfaceInfo` was provided during
+        /// construction of `interface_` and is also not made available otherwise.
+        /// For example, `gio.DBusProxy` implements `gio.DBusInterface` but allows for a `NULL`
+        /// `gio.DBusInterfaceInfo`.
         pub const get_info = struct {
-            pub fn call(p_class: anytype, p_interface_: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) *gio.DBusInterfaceInfo {
+            pub fn call(p_class: anytype, p_interface_: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) ?*gio.DBusInterfaceInfo {
                 return gobject.ext.as(DBusInterface.Iface, p_class).f_get_info.?(gobject.ext.as(DBusInterface, p_interface_));
             }
 
-            pub fn implement(p_class: anytype, p_implementation: *const fn (p_interface_: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) callconv(.c) *gio.DBusInterfaceInfo) void {
+            pub fn implement(p_class: anytype, p_implementation: *const fn (p_interface_: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance) callconv(.c) ?*gio.DBusInterfaceInfo) void {
                 gobject.ext.as(DBusInterface.Iface, p_class).f_get_info = @ptrCast(p_implementation);
             }
         };
@@ -27303,7 +27557,12 @@ pub const DBusInterface = opaque {
 
     /// Gets D-Bus introspection information for the D-Bus interface
     /// implemented by `interface_`.
-    extern fn g_dbus_interface_get_info(p_interface_: *DBusInterface) *gio.DBusInterfaceInfo;
+    ///
+    /// This can return `NULL` if no `gio.DBusInterfaceInfo` was provided during
+    /// construction of `interface_` and is also not made available otherwise.
+    /// For example, `gio.DBusProxy` implements `gio.DBusInterface` but allows for a `NULL`
+    /// `gio.DBusInterfaceInfo`.
+    extern fn g_dbus_interface_get_info(p_interface_: *DBusInterface) ?*gio.DBusInterfaceInfo;
     pub const getInfo = g_dbus_interface_get_info;
 
     /// Gets the `gio.DBusObject` that `interface_` belongs to, if any.
@@ -29754,9 +30013,9 @@ pub const DtlsServerConnection = opaque {
 /// short. Entity tags are somewhat like a more abstract version of the
 /// traditional mtime, and can be used to quickly determine if the file
 /// has been modified from the version on the file system. See the
-/// HTTP 1.1
-/// [specification](http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html)
-/// for HTTP `ETag` headers, which are a very similar concept.
+/// description of HTTP ETags in
+/// [RFC9110](https://www.rfc-editor.org/rfc/rfc9110.html`name`-etag).
+/// `GFile` Entity Tags are a very similar concept.
 pub const File = opaque {
     pub const Prerequisites = [_]type{gobject.Object};
     pub const Iface = gio.FileIface;
@@ -30159,29 +30418,29 @@ pub const File = opaque {
         };
 
         /// Gets the requested information about the files in a directory.
-        /// The result is a `gio.FileEnumerator` object that will give out
-        /// `gio.FileInfo` objects for all the files in the directory.
+        /// The result is a `FileEnumerator` object that will give out
+        /// `FileInfo` objects for all the files in the directory.
         ///
         /// The `attributes` value is a string that specifies the file
         /// attributes that should be gathered. It is not an error if
         /// it's not possible to read a particular requested attribute
         /// from a file - it just won't be set. `attributes` should
         /// be a comma-separated list of attributes or attribute wildcards.
-        /// The wildcard "*" means all attributes, and a wildcard like
-        /// "standard::*" means all attributes in the standard namespace.
-        /// An example attribute query be "standard::*,owner::user".
+        /// The wildcard `*` means all attributes, and a wildcard like
+        /// `"standard::*"` means all attributes in the standard namespace.
+        /// An example attribute query be `"standard::*,owner::user"`.
         /// The standard attributes are available as defines, like
-        /// `G_FILE_ATTRIBUTE_STANDARD_NAME`. `G_FILE_ATTRIBUTE_STANDARD_NAME` should
-        /// always be specified if you plan to call `gio.FileEnumerator.getChild` or
-        /// `gio.FileEnumerator.iterate` on the returned enumerator.
+        /// `FILE_ATTRIBUTE_STANDARD_NAME`. `FILE_ATTRIBUTE_STANDARD_NAME` should
+        /// always be specified if you plan to call `FileEnumerator.getChild` or
+        /// `FileEnumerator.iterate` on the returned enumerator.
         ///
         /// If `cancellable` is not `NULL`, then the operation can be cancelled
         /// by triggering the cancellable object from another thread. If the
-        /// operation was cancelled, the error `G_IO_ERROR_CANCELLED` will be
+        /// operation was cancelled, the error `gio.@"IOErrorEnum.CANCELLED"` will be
         /// returned.
         ///
-        /// If the file does not exist, the `G_IO_ERROR_NOT_FOUND` error will
-        /// be returned. If the file is not a directory, the `G_IO_ERROR_NOT_DIRECTORY`
+        /// If the file does not exist, the `gio.@"IOErrorEnum.NOT_FOUND"` error will
+        /// be returned. If the file is not a directory, the `gio.@"IOErrorEnum.NOT_DIRECTORY"`
         /// error will be returned. Other errors are possible too.
         pub const enumerate_children = struct {
             pub fn call(p_class: anytype, p_file: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_attributes: [*:0]const u8, p_flags: gio.FileQueryInfoFlags, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) ?*gio.FileEnumerator {
@@ -30227,9 +30486,17 @@ pub const File = opaque {
 
         /// Checks if the two given `GFiles` refer to the same file.
         ///
+        /// This function can be used with `gio.File.hash` to insert
+        /// `gio.File`s efficiently in a hash table.
+        ///
         /// Note that two `GFiles` that differ can still refer to the same
         /// file on the filesystem due to various forms of filename
-        /// aliasing.
+        /// aliasing. For local files, this function essentially compares the file paths,
+        /// so two `gio.File`s which point to different hard or soft links will not
+        /// be considered equal, despite pointing to the same content.
+        ///
+        /// For determining whether two files are hardlinked, see
+        /// `gio.FILE_ATTRIBUTE_ID_FILE`.
         ///
         /// This call does no blocking I/O.
         pub const equal = struct {
@@ -30968,7 +31235,7 @@ pub const File = opaque {
         /// that should be gathered. It is not an error if it's not possible
         /// to read a particular requested attribute from a file - it just
         /// won't be set. `attributes` should be a comma-separated list of
-        /// attributes or attribute wildcards. The wildcard "*" means all
+        /// attributes or attribute wildcards. The wildcard "\*" means all
         /// attributes, and a wildcard like "filesystem::*" means all attributes
         /// in the filesystem namespace. The standard namespace for filesystem
         /// attributes is "filesystem". Common attributes of interest are
@@ -31049,7 +31316,7 @@ pub const File = opaque {
         ///  - `gio.FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME`
         ///
         /// `attributes` should be a comma-separated list of attributes or attribute
-        /// wildcards. The wildcard `"*"` means all attributes, and a wildcard like
+        /// wildcards. The wildcard `"\*"` means all attributes, and a wildcard like
         /// `"standard::*"` means all attributes in the standard namespace.
         /// An example attribute query might be `"standard::*,owner::user"`.
         /// The standard attributes are available as defines, like
@@ -32052,29 +32319,29 @@ pub const File = opaque {
     pub const ejectMountableWithOperationFinish = g_file_eject_mountable_with_operation_finish;
 
     /// Gets the requested information about the files in a directory.
-    /// The result is a `gio.FileEnumerator` object that will give out
-    /// `gio.FileInfo` objects for all the files in the directory.
+    /// The result is a `FileEnumerator` object that will give out
+    /// `FileInfo` objects for all the files in the directory.
     ///
     /// The `attributes` value is a string that specifies the file
     /// attributes that should be gathered. It is not an error if
     /// it's not possible to read a particular requested attribute
     /// from a file - it just won't be set. `attributes` should
     /// be a comma-separated list of attributes or attribute wildcards.
-    /// The wildcard "*" means all attributes, and a wildcard like
-    /// "standard::*" means all attributes in the standard namespace.
-    /// An example attribute query be "standard::*,owner::user".
+    /// The wildcard `*` means all attributes, and a wildcard like
+    /// `"standard::*"` means all attributes in the standard namespace.
+    /// An example attribute query be `"standard::*,owner::user"`.
     /// The standard attributes are available as defines, like
-    /// `G_FILE_ATTRIBUTE_STANDARD_NAME`. `G_FILE_ATTRIBUTE_STANDARD_NAME` should
-    /// always be specified if you plan to call `gio.FileEnumerator.getChild` or
-    /// `gio.FileEnumerator.iterate` on the returned enumerator.
+    /// `FILE_ATTRIBUTE_STANDARD_NAME`. `FILE_ATTRIBUTE_STANDARD_NAME` should
+    /// always be specified if you plan to call `FileEnumerator.getChild` or
+    /// `FileEnumerator.iterate` on the returned enumerator.
     ///
     /// If `cancellable` is not `NULL`, then the operation can be cancelled
     /// by triggering the cancellable object from another thread. If the
-    /// operation was cancelled, the error `G_IO_ERROR_CANCELLED` will be
+    /// operation was cancelled, the error `gio.@"IOErrorEnum.CANCELLED"` will be
     /// returned.
     ///
-    /// If the file does not exist, the `G_IO_ERROR_NOT_FOUND` error will
-    /// be returned. If the file is not a directory, the `G_IO_ERROR_NOT_DIRECTORY`
+    /// If the file does not exist, the `gio.@"IOErrorEnum.NOT_FOUND"` error will
+    /// be returned. If the file is not a directory, the `gio.@"IOErrorEnum.NOT_DIRECTORY"`
     /// error will be returned. Other errors are possible too.
     extern fn g_file_enumerate_children(p_file: *File, p_attributes: [*:0]const u8, p_flags: gio.FileQueryInfoFlags, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) ?*gio.FileEnumerator;
     pub const enumerateChildren = g_file_enumerate_children;
@@ -32099,9 +32366,17 @@ pub const File = opaque {
 
     /// Checks if the two given `GFiles` refer to the same file.
     ///
+    /// This function can be used with `gio.File.hash` to insert
+    /// `gio.File`s efficiently in a hash table.
+    ///
     /// Note that two `GFiles` that differ can still refer to the same
     /// file on the filesystem due to various forms of filename
-    /// aliasing.
+    /// aliasing. For local files, this function essentially compares the file paths,
+    /// so two `gio.File`s which point to different hard or soft links will not
+    /// be considered equal, despite pointing to the same content.
+    ///
+    /// For determining whether two files are hardlinked, see
+    /// `gio.FILE_ATTRIBUTE_ID_FILE`.
     ///
     /// This call does no blocking I/O.
     extern fn g_file_equal(p_file1: *File, p_file2: *gio.File) c_int;
@@ -32739,7 +33014,7 @@ pub const File = opaque {
     /// that should be gathered. It is not an error if it's not possible
     /// to read a particular requested attribute from a file - it just
     /// won't be set. `attributes` should be a comma-separated list of
-    /// attributes or attribute wildcards. The wildcard "*" means all
+    /// attributes or attribute wildcards. The wildcard "\*" means all
     /// attributes, and a wildcard like "filesystem::*" means all attributes
     /// in the filesystem namespace. The standard namespace for filesystem
     /// attributes is "filesystem". Common attributes of interest are
@@ -32799,7 +33074,7 @@ pub const File = opaque {
     ///  - `gio.FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME`
     ///
     /// `attributes` should be a comma-separated list of attributes or attribute
-    /// wildcards. The wildcard `"*"` means all attributes, and a wildcard like
+    /// wildcards. The wildcard `"\*"` means all attributes, and a wildcard like
     /// `"standard::*"` means all attributes in the standard namespace.
     /// An example attribute query might be `"standard::*,owner::user"`.
     /// The standard attributes are available as defines, like
@@ -34854,6 +35129,12 @@ pub const NetworkMonitor = opaque {
     };
 
     /// Gets the default `gio.NetworkMonitor` for the system.
+    ///
+    /// Some implementations complete their initialization asynchronously:
+    /// properties such as `gio.NetworkMonitor.properties.network`-available may start at their
+    /// default values and update shortly afterwards, with notify emissions, once
+    /// the state is resolved from the thread-default main context of this first
+    /// call.
     extern fn g_network_monitor_get_default() *gio.NetworkMonitor;
     pub const getDefault = g_network_monitor_get_default;
 
@@ -35034,11 +35315,11 @@ pub const PollableInputStream = opaque {
         /// The behaviour of this method is undefined if
         /// `gio.PollableInputStream.canPoll` returns `FALSE` for `stream`.
         pub const read_nonblocking = struct {
-            pub fn call(p_class: anytype, p_stream: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_buffer: ?*[*]u8, p_count: usize, p_error: ?*?*glib.Error) isize {
+            pub fn call(p_class: anytype, p_stream: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_buffer: ?[*]u8, p_count: usize, p_error: ?*?*glib.Error) isize {
                 return gobject.ext.as(PollableInputStream.Iface, p_class).f_read_nonblocking.?(gobject.ext.as(PollableInputStream, p_stream), p_buffer, p_count, p_error);
             }
 
-            pub fn implement(p_class: anytype, p_implementation: *const fn (p_stream: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_buffer: ?*[*]u8, p_count: usize, p_error: ?*?*glib.Error) callconv(.c) isize) void {
+            pub fn implement(p_class: anytype, p_implementation: *const fn (p_stream: *@typeInfo(@TypeOf(p_class)).pointer.child.Instance, p_buffer: ?[*]u8, p_count: usize, p_error: ?*?*glib.Error) callconv(.c) isize) void {
                 gobject.ext.as(PollableInputStream.Iface, p_class).f_read_nonblocking = @ptrCast(p_implementation);
             }
         };
@@ -35100,7 +35381,7 @@ pub const PollableInputStream = opaque {
     ///
     /// The behaviour of this method is undefined if
     /// `gio.PollableInputStream.canPoll` returns `FALSE` for `stream`.
-    extern fn g_pollable_input_stream_read_nonblocking(p_stream: *PollableInputStream, p_buffer: *[*]u8, p_count: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
+    extern fn g_pollable_input_stream_read_nonblocking(p_stream: *PollableInputStream, p_buffer: [*]u8, p_count: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) isize;
     pub const readNonblocking = g_pollable_input_stream_read_nonblocking;
 
     extern fn g_pollable_input_stream_get_type() usize;
@@ -37264,7 +37545,7 @@ pub const AppInfoIface = extern struct {
     f_set_as_last_used_for_type: ?*const fn (p_appinfo: *gio.AppInfo, p_content_type: [*:0]const u8, p_error: ?*?*glib.Error) callconv(.c) c_int,
     /// Retrieves the list of content types that `app_info`
     ///   claims to support.
-    f_get_supported_types: ?*const fn (p_appinfo: *gio.AppInfo) callconv(.c) [*][*:0]const u8,
+    f_get_supported_types: ?*const fn (p_appinfo: *gio.AppInfo) callconv(.c) ?[*][*:0]const u8,
     /// Asynchronously launches an application with a list of
     ///   URIs. (Since: 2.60)
     f_launch_uris_async: ?*const fn (p_appinfo: *gio.AppInfo, p_uris: ?*glib.List, p_context: ?*gio.AppLaunchContext, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) callconv(.c) void,
@@ -37653,6 +37934,21 @@ pub const CredentialsClass = opaque {
     }
 };
 
+pub const DBusActionGroupClass = extern struct {
+    pub const Instance = gio.DBusActionGroup;
+
+    f_parent_class: gobject.ObjectClass,
+
+    pub fn as(p_instance: *DBusActionGroupClass, comptime P_T: type) *P_T {
+        return gobject.ext.as(P_T, p_instance);
+    }
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
 /// Information about an annotation.
 pub const DBusAnnotationInfo = extern struct {
     /// The reference count or -1 if statically allocated.
@@ -37741,7 +38037,7 @@ pub const DBusInterfaceIface = extern struct {
     /// The parent interface.
     f_parent_iface: gobject.TypeInterface,
     /// Returns a `gio.DBusInterfaceInfo`. See `gio.DBusInterface.getInfo`.
-    f_get_info: ?*const fn (p_interface_: *gio.DBusInterface) callconv(.c) *gio.DBusInterfaceInfo,
+    f_get_info: ?*const fn (p_interface_: *gio.DBusInterface) callconv(.c) ?*gio.DBusInterfaceInfo,
     /// Gets the enclosing `gio.DBusObject`. See `gio.DBusInterface.getObject`.
     f_get_object: ?*const fn (p_interface_: *gio.DBusInterface) callconv(.c) ?*gio.DBusObject,
     /// Sets the enclosing `gio.DBusObject`. See `gio.DBusInterface.setObject`.
@@ -37857,7 +38153,9 @@ pub const DBusInterfaceSkeletonClass = extern struct {
     f_get_properties: ?*const fn (p_interface_: *gio.DBusInterfaceSkeleton) callconv(.c) *glib.Variant,
     /// Emits outstanding changes, if any. See `gio.DBusInterfaceSkeleton.flush`.
     f_flush: ?*const fn (p_interface_: *gio.DBusInterfaceSkeleton) callconv(.c) void,
-    f_vfunc_padding: [8]*anyopaque,
+    /// Dispatches a method invocation. (Since: 2.88)
+    f_method_dispatch: ?*const fn (p_interface_: *gio.DBusInterfaceSkeleton, p_method_call_func: gio.DBusInterfaceMethodCallFunc, p_invocation: *gio.DBusMethodInvocation, p_flags: gio.DBusInterfaceSkeletonFlags, p_object: *gio.DBusObject) callconv(.c) void,
+    f_vfunc_padding: [7]*anyopaque,
     /// Signal class handler for the `gio.DBusInterfaceSkeleton.signals.g`-authorize-method signal.
     f_g_authorize_method: ?*const fn (p_interface_: *gio.DBusInterfaceSkeleton, p_invocation: *gio.DBusMethodInvocation) callconv(.c) c_int,
     f_signal_padding: [8]*anyopaque,
@@ -38576,8 +38874,10 @@ pub const DtlsServerConnectionInterface = extern struct {
     }
 };
 
-pub const EmblemClass = opaque {
+pub const EmblemClass = extern struct {
     pub const Instance = gio.Emblem;
+
+    f_parent_class: gobject.ObjectClass,
 
     pub fn as(p_instance: *EmblemClass, comptime P_T: type) *P_T {
         return gobject.ext.as(P_T, p_instance);
@@ -38672,16 +38972,16 @@ pub const FileAttributeInfoList = extern struct {
 /// Determines if a string matches a file attribute.
 pub const FileAttributeMatcher = opaque {
     /// Creates a new file attribute matcher, which matches attributes
-    /// against a given string. `GFileAttributeMatchers` are reference
+    /// against a given string. [GFileAttributeMatchers]`FileAttributeMatcher` are reference
     /// counted structures, and are created with a reference count of 1. If
-    /// the number of references falls to 0, the `gio.FileAttributeMatcher` is
+    /// the number of references falls to 0, the `FileAttributeMatcher` is
     /// automatically destroyed.
     ///
     /// The `attributes` string should be formatted with specific keys separated
-    /// from namespaces with a double colon. Several "namespace::key" strings may be
-    /// concatenated with a single comma (e.g. "standard::type,standard::is-hidden").
-    /// The wildcard "*" may be used to match all keys and namespaces, or
-    /// "namespace::*" will match all keys in a given namespace.
+    /// from namespaces with a double colon. Several `"namespace::key"` strings may be
+    /// concatenated with a single comma (e.g. `"standard::type,standard::is-hidden"`).
+    /// The wildcard `"*"` may be used to match all keys and namespaces, or
+    /// `"namespace::*"` will match all keys in a given namespace.
     ///
     /// ## Examples of file attribute matcher strings and results
     ///
@@ -38695,7 +38995,7 @@ pub const FileAttributeMatcher = opaque {
 
     /// Checks if the matcher will match all of the keys in a given namespace.
     /// This will always return `TRUE` if a wildcard character is in use (e.g. if
-    /// matcher was created with "standard::*" and `ns` is "standard", or if matcher was created
+    /// matcher was created with "standard::\*" and `ns` is "standard", or if matcher was created
     /// using "*" and namespace is anything.)
     ///
     /// TODO: this is awkwardly worded.
@@ -39466,6 +39766,36 @@ pub const IOStreamPrivate = opaque {
     }
 };
 
+pub const IPTosMessageClass = extern struct {
+    pub const Instance = gio.IPTosMessage;
+
+    f_parent_class: gio.SocketControlMessageClass,
+
+    pub fn as(p_instance: *IPTosMessageClass, comptime P_T: type) *P_T {
+        return gobject.ext.as(P_T, p_instance);
+    }
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
+pub const IPv6TclassMessageClass = extern struct {
+    pub const Instance = gio.IPv6TclassMessage;
+
+    f_parent_class: gio.SocketControlMessageClass,
+
+    pub fn as(p_instance: *IPv6TclassMessageClass, comptime P_T: type) *P_T {
+        return gobject.ext.as(P_T, p_instance);
+    }
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
 /// GIconIface is used to implement GIcon types for various
 /// different systems. See `gio.ThemedIcon` and `gio.LoadableIcon` for
 /// examples of how to implement this interface.
@@ -39641,7 +39971,7 @@ pub const InputStreamClass = extern struct {
     f_read_fn: ?*const fn (p_stream: *gio.InputStream, p_buffer: ?*anyopaque, p_count: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) callconv(.c) isize,
     f_skip: ?*const fn (p_stream: *gio.InputStream, p_count: usize, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) callconv(.c) isize,
     f_close_fn: ?*const fn (p_stream: *gio.InputStream, p_cancellable: ?*gio.Cancellable, p_error: ?*?*glib.Error) callconv(.c) c_int,
-    f_read_async: ?*const fn (p_stream: *gio.InputStream, p_buffer: ?*[*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) callconv(.c) void,
+    f_read_async: ?*const fn (p_stream: *gio.InputStream, p_buffer: ?[*]u8, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) callconv(.c) void,
     f_read_finish: ?*const fn (p_stream: *gio.InputStream, p_result: *gio.AsyncResult, p_error: ?*?*glib.Error) callconv(.c) isize,
     f_skip_async: ?*const fn (p_stream: *gio.InputStream, p_count: usize, p_io_priority: c_int, p_cancellable: ?*gio.Cancellable, p_callback: ?gio.AsyncReadyCallback, p_user_data: ?*anyopaque) callconv(.c) void,
     f_skip_finish: ?*const fn (p_stream: *gio.InputStream, p_result: *gio.AsyncResult, p_error: ?*?*glib.Error) callconv(.c) isize,
@@ -40256,7 +40586,7 @@ pub const PollableInputStreamInterface = extern struct {
     f_create_source: ?*const fn (p_stream: *gio.PollableInputStream, p_cancellable: ?*gio.Cancellable) callconv(.c) *glib.Source,
     /// Does a non-blocking read or returns
     ///   `G_IO_ERROR_WOULD_BLOCK`
-    f_read_nonblocking: ?*const fn (p_stream: *gio.PollableInputStream, p_buffer: ?*[*]u8, p_count: usize, p_error: ?*?*glib.Error) callconv(.c) isize,
+    f_read_nonblocking: ?*const fn (p_stream: *gio.PollableInputStream, p_buffer: ?[*]u8, p_count: usize, p_error: ?*?*glib.Error) callconv(.c) isize,
 
     pub fn as(p_instance: *PollableInputStreamInterface, comptime P_T: type) *P_T {
         return gobject.ext.as(P_T, p_instance);
@@ -40651,9 +40981,9 @@ pub const ResolverPrivate = opaque {
 /// supported.
 ///
 /// Substitutions must start with a slash, and must not contain a trailing slash
-/// before the `=`.  The path after the slash should ideally be absolute, but
-/// this is not strictly required.  It is possible to overlay the location of a
-/// single resource with an individual file.
+/// before the `=`.  The filesystem path after the `=` should ideally be absolute,
+/// but this is not strictly required.  It is possible to overlay the location of
+/// a single resource with an individual file.
 pub const Resource = opaque {
     /// Loads a binary resource bundle and creates a `gio.Resource`
     /// representation of it, allowing you to query it for data.
@@ -42667,6 +42997,26 @@ pub const DriveStartStopType = enum(c_int) {
     }
 };
 
+/// Possible values of Explicit Congestion Notification code points.
+///
+/// These appear in `TOS` (IPv4) or `TCLASS` (IPv6) packet headers and
+/// are described in [RFC 3168](https://www.rfc-editor.org/rfc/rfc3168`section`-5).
+pub const EcnCodePoint = enum(c_int) {
+    no_ecn = 0,
+    ect_1 = 1,
+    ect_0 = 2,
+    ect_ce = 3,
+    _,
+
+    extern fn g_ecn_code_point_get_type() usize;
+    pub const getGObjectType = g_ecn_code_point_get_type;
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
 /// GEmblemOrigin is used to add information about the origin of the emblem
 /// to `gio.Emblem`.
 pub const EmblemOrigin = enum(c_int) {
@@ -42868,21 +43218,6 @@ pub const IOErrorEnum = enum(c_int) {
     pub const connection_closed = IOErrorEnum.broken_pipe;
     extern fn g_io_error_enum_get_type() usize;
     pub const getGObjectType = g_io_error_enum_get_type;
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// Flags for use with `gio.IOModuleScope.new`.
-pub const IOModuleScopeFlags = enum(c_int) {
-    none = 0,
-    block_duplicates = 1,
-    _,
-
-    extern fn g_io_module_scope_flags_get_type() usize;
-    pub const getGObjectType = g_io_module_scope_flags_get_type;
 
     test {
         @setEvalBranchQuota(100_000);
@@ -43217,22 +43552,6 @@ pub const TlsAuthenticationMode = enum(c_int) {
     }
 };
 
-/// Flags for `gio.TlsInteraction.requestCertificate`,
-/// `gio.TlsInteraction.requestCertificateAsync`, and
-/// `gio.TlsInteraction.invokeRequestCertificate`.
-pub const TlsCertificateRequestFlags = enum(c_int) {
-    none = 0,
-    _,
-
-    extern fn g_tls_certificate_request_flags_get_type() usize;
-    pub const getGObjectType = g_tls_certificate_request_flags_get_type;
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
 /// An error code used with `G_TLS_CHANNEL_BINDING_ERROR` in a `glib.Error` to
 /// indicate a TLS channel binding retrieval error.
 pub const TlsChannelBindingError = enum(c_int) {
@@ -43268,23 +43587,6 @@ pub const TlsChannelBindingType = enum(c_int) {
 
     extern fn g_tls_channel_binding_type_get_type() usize;
     pub const getGObjectType = g_tls_channel_binding_type_get_type;
-
-    test {
-        @setEvalBranchQuota(100_000);
-        std.testing.refAllDecls(@This());
-    }
-};
-
-/// Flags for `gio.TlsDatabase.lookupCertificateForHandle`,
-/// `gio.TlsDatabase.lookupCertificateIssuer`,
-/// and `gio.TlsDatabase.lookupCertificatesIssuedBy`.
-pub const TlsDatabaseLookupFlags = enum(c_int) {
-    none = 0,
-    keypair = 1,
-    _,
-
-    extern fn g_tls_database_lookup_flags_get_type() usize;
-    pub const getGObjectType = g_tls_database_lookup_flags_get_type;
 
     test {
         @setEvalBranchQuota(100_000);
@@ -44630,6 +44932,52 @@ pub const FileQueryInfoFlags = packed struct(c_uint) {
     }
 };
 
+/// Flags for use with `gio.IOModuleScope.new`.
+pub const IOModuleScopeFlags = packed struct(c_uint) {
+    block_duplicates: bool = false,
+    _padding1: bool = false,
+    _padding2: bool = false,
+    _padding3: bool = false,
+    _padding4: bool = false,
+    _padding5: bool = false,
+    _padding6: bool = false,
+    _padding7: bool = false,
+    _padding8: bool = false,
+    _padding9: bool = false,
+    _padding10: bool = false,
+    _padding11: bool = false,
+    _padding12: bool = false,
+    _padding13: bool = false,
+    _padding14: bool = false,
+    _padding15: bool = false,
+    _padding16: bool = false,
+    _padding17: bool = false,
+    _padding18: bool = false,
+    _padding19: bool = false,
+    _padding20: bool = false,
+    _padding21: bool = false,
+    _padding22: bool = false,
+    _padding23: bool = false,
+    _padding24: bool = false,
+    _padding25: bool = false,
+    _padding26: bool = false,
+    _padding27: bool = false,
+    _padding28: bool = false,
+    _padding29: bool = false,
+    _padding30: bool = false,
+    _padding31: bool = false,
+
+    pub const flags_none: IOModuleScopeFlags = @bitCast(@as(c_uint, 0));
+    pub const flags_block_duplicates: IOModuleScopeFlags = @bitCast(@as(c_uint, 1));
+    extern fn g_io_module_scope_flags_get_type() usize;
+    pub const getGObjectType = g_io_module_scope_flags_get_type;
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
 /// GIOStreamSpliceFlags determine how streams should be spliced.
 pub const IOStreamSpliceFlags = packed struct(c_uint) {
     close_stream1: bool = false,
@@ -45223,6 +45571,101 @@ pub const TlsCertificateFlags = packed struct(c_uint) {
     pub const flags_validate_all: TlsCertificateFlags = @bitCast(@as(c_uint, 127));
     extern fn g_tls_certificate_flags_get_type() usize;
     pub const getGObjectType = g_tls_certificate_flags_get_type;
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
+/// Flags for `gio.TlsInteraction.requestCertificate`,
+/// `gio.TlsInteraction.requestCertificateAsync`, and
+/// `gio.TlsInteraction.invokeRequestCertificate`.
+pub const TlsCertificateRequestFlags = packed struct(c_uint) {
+    _padding0: bool = false,
+    _padding1: bool = false,
+    _padding2: bool = false,
+    _padding3: bool = false,
+    _padding4: bool = false,
+    _padding5: bool = false,
+    _padding6: bool = false,
+    _padding7: bool = false,
+    _padding8: bool = false,
+    _padding9: bool = false,
+    _padding10: bool = false,
+    _padding11: bool = false,
+    _padding12: bool = false,
+    _padding13: bool = false,
+    _padding14: bool = false,
+    _padding15: bool = false,
+    _padding16: bool = false,
+    _padding17: bool = false,
+    _padding18: bool = false,
+    _padding19: bool = false,
+    _padding20: bool = false,
+    _padding21: bool = false,
+    _padding22: bool = false,
+    _padding23: bool = false,
+    _padding24: bool = false,
+    _padding25: bool = false,
+    _padding26: bool = false,
+    _padding27: bool = false,
+    _padding28: bool = false,
+    _padding29: bool = false,
+    _padding30: bool = false,
+    _padding31: bool = false,
+
+    pub const flags_none: TlsCertificateRequestFlags = @bitCast(@as(c_uint, 0));
+    extern fn g_tls_certificate_request_flags_get_type() usize;
+    pub const getGObjectType = g_tls_certificate_request_flags_get_type;
+
+    test {
+        @setEvalBranchQuota(100_000);
+        std.testing.refAllDecls(@This());
+    }
+};
+
+/// Flags for `gio.TlsDatabase.lookupCertificateForHandle`,
+/// `gio.TlsDatabase.lookupCertificateIssuer`,
+/// and `gio.TlsDatabase.lookupCertificatesIssuedBy`.
+pub const TlsDatabaseLookupFlags = packed struct(c_uint) {
+    keypair: bool = false,
+    _padding1: bool = false,
+    _padding2: bool = false,
+    _padding3: bool = false,
+    _padding4: bool = false,
+    _padding5: bool = false,
+    _padding6: bool = false,
+    _padding7: bool = false,
+    _padding8: bool = false,
+    _padding9: bool = false,
+    _padding10: bool = false,
+    _padding11: bool = false,
+    _padding12: bool = false,
+    _padding13: bool = false,
+    _padding14: bool = false,
+    _padding15: bool = false,
+    _padding16: bool = false,
+    _padding17: bool = false,
+    _padding18: bool = false,
+    _padding19: bool = false,
+    _padding20: bool = false,
+    _padding21: bool = false,
+    _padding22: bool = false,
+    _padding23: bool = false,
+    _padding24: bool = false,
+    _padding25: bool = false,
+    _padding26: bool = false,
+    _padding27: bool = false,
+    _padding28: bool = false,
+    _padding29: bool = false,
+    _padding30: bool = false,
+    _padding31: bool = false,
+
+    pub const flags_none: TlsDatabaseLookupFlags = @bitCast(@as(c_uint, 0));
+    pub const flags_keypair: TlsDatabaseLookupFlags = @bitCast(@as(c_uint, 1));
+    extern fn g_tls_database_lookup_flags_get_type() usize;
+    pub const getGObjectType = g_tls_database_lookup_flags_get_type;
 
     test {
         @setEvalBranchQuota(100_000);
@@ -46555,6 +46998,13 @@ pub const FILE_ATTRIBUTE_GVFS_BACKEND = "gvfs::backend";
 ///
 /// An example use would be during listing files, to avoid recursive
 /// directory scanning.
+///
+/// For local files on Linux, this is a combination of the file’s device number
+/// and inode, so is invariant with respect to hard linking. The format used by
+/// other VFS implementations may vary, and some VFS backends may not set it.
+///
+/// For simply seeing if two `gio.File` instances refer to the same path
+/// on disk, see `gio.File.equal`.
 pub const FILE_ATTRIBUTE_ID_FILE = "id::file";
 /// A key in the "id" namespace for getting the file system identifier.
 ///
@@ -46722,6 +47172,11 @@ pub const FILE_ATTRIBUTE_STANDARD_FAST_CONTENT_TYPE = "standard::fast-content-ty
 /// The value for this key should contain a `gio.Icon`.
 pub const FILE_ATTRIBUTE_STANDARD_ICON = "standard::icon";
 /// A key in the "standard" namespace for checking if a file is a backup file.
+///
+/// The exact semantics of what constitutes a backup file are backend-specific.
+/// For local files, a file is considered a backup if its name ends with `~`
+/// and it is a regular file. This follows the POSIX convention used by text
+/// editors such as Emacs.
 ///
 /// Corresponding `gio.FileAttributeType` is `G_FILE_ATTRIBUTE_TYPE_BOOLEAN`.
 pub const FILE_ATTRIBUTE_STANDARD_IS_BACKUP = "standard::is-backup";

@@ -45,9 +45,9 @@ pub fn typeFor(comptime T: type) gobject.Type {
         return types.uchar;
     } else if (T == bool) {
         return types.boolean;
-    } else if (T == c_int) {
+    } else if (T == c_int or T == i32) {
         return types.int;
-    } else if (T == c_uint) {
+    } else if (T == c_uint or T == u32) {
         return types.uint;
     } else if (T == c_long) {
         return types.long;
@@ -184,7 +184,7 @@ pub fn defineClass(
     if (parent_info != .@"struct" or parent_info.@"struct".layout != .@"extern" or !@hasDecl(Instance.Parent, "getGObjectType")) {
         @compileError("the defined parent type " ++ @typeName(Instance.Parent) ++ " does not appear to be a GObject class type");
     }
-    if (instance_info.@"struct".fields.len == 0 or instance_info.@"struct".fields[0].type != Instance.Parent) {
+    if (instance_info.@"struct".field_types.len == 0 or instance_info.@"struct".field_types[0] != Instance.Parent) {
         @compileError("the first field of the instance struct must have type " ++ @typeName(Instance.Parent));
     }
 
@@ -198,7 +198,7 @@ pub fn defineClass(
     if (!@hasDecl(Instance.Class, "Instance") or Instance.Class.Instance != Instance) {
         @compileError("a class type must have a declaration named Instance pointing to the instance type");
     }
-    if (class_info.@"struct".fields.len == 0 or class_info.@"struct".fields[0].type != Instance.Parent.Class) {
+    if (class_info.@"struct".field_types.len == 0 or class_info.@"struct".field_types[0] != Instance.Parent.Class) {
         @compileError("the first field of the class struct must have type " ++ @typeName(Instance.Parent.Class));
     }
 
@@ -247,7 +247,7 @@ pub fn defineClass(
 
                 {
                     const Implements = if (@hasDecl(Instance, "Implements")) Instance.Implements else [_]type{};
-                    comptime var found = [_]bool{false} ** Implements.len;
+                    comptime var found: [Implements.len]bool = @splat(false);
                     inline for (options.implements) |implementation| {
                         inline for (Implements, &found) |Iface, *found_match| {
                             if (implementation.Iface == Iface) {
@@ -420,19 +420,20 @@ pub fn defineEnum(
     if (enum_info != .@"enum" or enum_info.@"enum".tag_type != c_int) {
         @compileError("an enum type must have a tag type of c_int");
     }
-    if (!enum_info.@"enum".is_exhaustive) {
+    if (enum_info.@"enum".mode == .nonexhaustive) {
         @compileError("an enum type must be exhaustive");
     }
 
-    const n_values = enum_info.@"enum".fields.len;
+    const n_values = enum_info.@"enum".field_names.len;
     var enum_values: [n_values + 1]gobject.EnumValue = undefined;
-    for (enum_info.@"enum".fields, enum_values[0..n_values]) |field, *value| {
+    for (enum_info.@"enum".field_names, enum_values[0..n_values], 0..) |field, *value, i| {
         value.* = .{
-            .f_value = field.value,
-            .f_value_name = field.name,
-            .f_value_nick = field.name,
+            .f_value = enum_info.@"enum".field_values[i],
+            .f_value_name = field,
+            .f_value_nick = field,
         };
     }
+
     enum_values[n_values] = .{
         .f_value = 0,
         .f_value_name = null,
@@ -493,22 +494,23 @@ pub fn defineFlags(
     }
 
     comptime var n_values = 0;
-    for (flags_info.@"struct".fields) |field| {
-        if (!std.mem.startsWith(u8, field.name, "_")) {
-            if (@bitSizeOf(field.type) != 1) {
-                @compileError("non-padding flags field " ++ field.name ++ " must be 1 bit");
+    const flags_info_struct = flags_info.@"struct";
+    for (flags_info_struct.field_names, 0..) |field, i| {
+        if (!std.mem.startsWith(u8, field, "_")) {
+            if (@bitSizeOf(flags_info_struct.field_types[i]) != 1) {
+                @compileError("non-padding flags field " ++ field ++ " must be 1 bit");
             }
             n_values += 1;
         }
     }
     comptime var flags_values: [n_values + 1]gobject.FlagsValue = undefined;
     var current_value = 0;
-    for (flags_info.@"struct".fields) |field| {
-        if (!std.mem.startsWith(u8, field.name, "_")) {
+    for (flags_info.@"struct".field_names) |field| {
+        if (!std.mem.startsWith(u8, field, "_")) {
             flags_values[current_value] = .{
-                .f_value = 1 << @bitOffsetOf(Flags, field.name),
-                .f_value_name = field.name,
-                .f_value_nick = field.name,
+                .f_value = 1 << @bitOffsetOf(Flags, field),
+                .f_value_name = field,
+                .f_value_nick = field,
             };
             current_value += 1;
         }
@@ -542,10 +544,7 @@ test defineFlags {
         two: i1 = -1,
         _padding0: u2 = 0,
         three: u1 = 1,
-        _padding1: @Type(.{ .int = .{
-            .signedness = .unsigned,
-            .bits = @bitSizeOf(c_uint) - 5,
-        } }) = 0,
+        _padding1: @Int(.unsigned, @bitSizeOf(c_uint) - 5) = 0,
 
         pub const getGObjectType = gobject.ext.defineFlags(@This(), .{});
     };
@@ -1411,7 +1410,7 @@ pub fn defineProperty(
 ///
 /// The properties passed in `properties` should be the structs returned by
 /// `defineProperty`.
-pub fn registerProperties(class: anytype, properties: []const type) void {
+pub fn registerProperties(class: anytype, comptime properties: []const type) void {
     const Instance = @typeInfo(@TypeOf(class)).pointer.child.Instance;
     gobject.Object.virtual_methods.get_property.implement(class, struct {
         fn getProperty(object: *Instance, id: c_uint, value: *gobject.Value, _: *gobject.ParamSpec) callconv(.c) void {
@@ -1437,21 +1436,22 @@ pub fn registerProperties(class: anytype, properties: []const type) void {
 }
 
 pub fn SignalHandler(comptime Itype: type, comptime param_types: []const type, comptime DataType: type, comptime ReturnType: type) type {
-    return *const @Type(.{ .@"fn" = .{
-        .calling_convention = .c,
-        .is_generic = false,
-        .is_var_args = false,
-        .return_type = ReturnType,
-        .params = params: {
-            var params: [param_types.len + 2]std.builtin.Type.Fn.Param = undefined;
-            params[0] = .{ .is_generic = false, .is_noalias = false, .type = *Itype };
-            for (param_types, params[1 .. params.len - 1]) |ParamType, *type_param| {
-                type_param.* = .{ .is_generic = false, .is_noalias = false, .type = ParamType };
-            }
-            params[params.len - 1] = .{ .is_generic = false, .is_noalias = false, .type = DataType };
-            break :params &params;
-        },
-    } });
+    var fn_param_types: [param_types.len + 2]type = undefined;
+    var fn_param_attrs: [param_types.len + 2]std.builtin.Type.Fn.ParamAttributes = undefined;
+    fn_param_types[0] = *Itype;
+    fn_param_attrs[0] = .{};
+    for (param_types, 0..) |ParamType, i| {
+        fn_param_types[i + 1] = ParamType;
+        fn_param_attrs[i + 1] = .{};
+    }
+    fn_param_types[param_types.len + 1] = DataType;
+    fn_param_attrs[param_types.len + 1] = .{};
+    return *const @Fn(
+        &fn_param_types,
+        &fn_param_attrs,
+        ReturnType,
+        .{ .@"callconv" = .c },
+    );
 }
 
 pub const RegisterSignalOptions = struct {
@@ -1478,24 +1478,7 @@ pub fn defineSignal(
     comptime param_types: []const type,
     comptime ReturnType: type,
 ) type {
-    const EmitParams = @Type(.{ .@"struct" = .{
-        .layout = .auto,
-        .fields = fields: {
-            var fields: [param_types.len]std.builtin.Type.StructField = undefined;
-            for (param_types, &fields, 0..) |ParamType, *field, i| {
-                field.* = .{
-                    .name = std.fmt.comptimePrint("{}", .{i}),
-                    .type = ParamType,
-                    .default_value_ptr = null,
-                    .is_comptime = false,
-                    .alignment = @alignOf(ParamType),
-                };
-            }
-            break :fields &fields;
-        },
-        .decls = &.{},
-        .is_tuple = true,
-    } });
+    const EmitParams = @Tuple(param_types);
 
     return struct {
         /// The ID of the signal. Initialized once the signal is registered.
@@ -1660,12 +1643,12 @@ pub fn isA(self: anytype, comptime T: type) bool {
 /// Creates a new instance of an object type with the given properties.
 pub fn newInstance(comptime T: type, properties: anytype) *T {
     const typeInfo = @typeInfo(@TypeOf(properties)).@"struct";
-    const n_props = typeInfo.fields.len;
+    const n_props = typeInfo.field_names.len;
     var names: [n_props][*:0]const u8 = undefined;
     var values: [n_props]gobject.Value = undefined;
-    inline for (typeInfo.fields, 0..) |field, i| {
-        names[i] = field.name ++ "\x00";
-        values[i] = gobject.ext.Value.newFrom(@field(properties, field.name));
+    inline for (typeInfo.field_names, 0..) |field, i| {
+        names[i] = field ++ "\x00";
+        values[i] = gobject.ext.Value.newFrom(@field(properties, field));
     }
     defer for (&values) |*value| value.unset();
     const instance = gobject.Object.newWithProperties(T.getGObjectType(), n_props, &names, &values);
@@ -1702,9 +1685,9 @@ pub const Value = struct {
             _ = value.init(types.uchar);
         } else if (T == bool) {
             _ = value.init(types.boolean);
-        } else if (T == c_int) {
+        } else if (T == c_int or T == i32) {
             _ = value.init(types.int);
-        } else if (T == c_uint) {
+        } else if (T == c_uint or T == u32) {
             _ = value.init(types.uint);
         } else if (T == c_long) {
             _ = value.init(types.long);
@@ -1749,9 +1732,9 @@ pub const Value = struct {
             return value.getUchar();
         } else if (T == bool) {
             return value.getBoolean() != 0;
-        } else if (T == c_int) {
+        } else if (T == c_int or T == i32) {
             return value.getInt();
-        } else if (T == c_uint) {
+        } else if (T == c_uint or T == u32) {
             return value.getUint();
         } else if (T == c_long) {
             return value.getLong();
@@ -1770,7 +1753,7 @@ pub const Value = struct {
                 @compileError("cannot guarantee value is non-null");
             }
             const Pointer = @typeInfo(@typeInfo(T).optional.child).pointer;
-            if (!Pointer.is_const) {
+            if (!Pointer.attrs.@"const") {
                 @compileError("get does not take ownership; can only return const strings");
             }
             return switch (Pointer.size) {
@@ -1815,9 +1798,9 @@ pub const Value = struct {
             return value.getUchar();
         } else if (T == bool) {
             return value.getBoolean() != 0;
-        } else if (T == c_int) {
+        } else if (T == c_int or T == i32) {
             return value.getInt();
-        } else if (T == c_uint) {
+        } else if (T == c_uint or T == u32) {
             return value.getUint();
         } else if (T == c_long) {
             return value.getLong();
@@ -1881,9 +1864,9 @@ pub const Value = struct {
             value.setUchar(contents);
         } else if (T == bool) {
             value.setBoolean(@intFromBool(contents));
-        } else if (T == c_int) {
+        } else if (T == c_int or T == i32) {
             value.setInt(contents);
-        } else if (T == c_uint) {
+        } else if (T == c_uint or T == u32) {
             value.setUint(contents);
         } else if (T == c_long) {
             value.setLong(contents);
@@ -1940,9 +1923,9 @@ pub const Value = struct {
             value.setUchar(contents);
         } else if (T == bool) {
             value.setBoolean(@intFromBool(contents));
-        } else if (T == c_int) {
+        } else if (T == c_int or T == i32) {
             value.setInt(contents);
-        } else if (T == c_uint) {
+        } else if (T == c_uint or T == u32) {
             value.setUint(contents);
         } else if (T == c_long) {
             value.setLong(contents);
@@ -1958,8 +1941,8 @@ pub const Value = struct {
             value.setDouble(contents);
         } else if (isCString(T)) {
             const is_const = switch (@typeInfo(T)) {
-                .pointer => |pointer| pointer.is_const,
-                .optional => |optional| @typeInfo(optional.child).pointer.is_const,
+                .pointer => |pointer| pointer.attrs.@"const",
+                .optional => |optional| @typeInfo(optional.child).pointer.attrs.@"const",
                 else => comptime unreachable,
             };
             if (is_const) {
@@ -2190,10 +2173,7 @@ const test_types = struct {
         one: bool = false,
         two: bool = false,
         three: bool = false,
-        _padding1: @Type(.{ .int = .{
-            .signedness = .unsigned,
-            .bits = @bitSizeOf(c_uint) - 3,
-        } }) = 0,
+        _padding1: @Int(.unsigned, @bitSizeOf(c_uint) - 3) = 0,
 
         pub const getGObjectType = gobject.ext.defineFlags(@This(), .{});
     };
